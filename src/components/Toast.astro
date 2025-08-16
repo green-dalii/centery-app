@@ -1,0 +1,24 @@
+<div id="toast" class="fixed top-4 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-4 py-2 rounded-md shadow-lg z-50 hidden">
+    <span id="toast-message"></span>
+</div>
+
+<script>
+// Utility functions
+function showToast(message: string, type: string = 'info') {
+    const toast = document.getElementById('toast');
+    const toastMessage = document.getElementById('toast-message');
+    if (!toast || !toastMessage) return;
+    
+    toastMessage.textContent = message;
+    toast.className = `fixed top-4 left-1/2 transform -translate-x-1/2 px-4 py-2 rounded-md shadow-lg z-50 ${
+        type === 'error' ? 'bg-red-500' : type === 'success' ? 'bg-green-500' : 'bg-gray-800'
+    } text-white`;
+    toast.classList.remove('hidden');
+    setTimeout(() => toast?.classList.add('hidden'), 3000);
+}
+
+// Make it globally available
+if (typeof window !== 'undefined') {
+    (window as any).showToast = showToast;
+}
+</script>

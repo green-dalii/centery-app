@@ -1,0 +1,167 @@
+---
+---
+
+<div class="p-6">
+    <div class="mb-6">
+        <div class="flex bg-gray-100 rounded-lg p-1 mb-6">
+            <button id="login-btn" class="flex-1 py-2 px-4 rounded-md bg-white shadow-sm font-medium text-primary-600">登录</button>
+            <button id="register-btn" class="flex-1 py-2 px-4 rounded-md font-medium text-gray-600">注册</button>
+        </div>
+    </div>
+
+    <!-- Login Form -->
+    <div id="login-form" class="space-y-4">
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">用户名</label>
+            <input type="text" id="login-username" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary" placeholder="请输入用户名">
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">密码</label>
+            <input type="password" id="login-password" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary" placeholder="请输入密码">
+        </div>
+        <button id="login-submit" class="w-full bg-primary-500 text-white py-2 px-4 rounded-md hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary">登录</button>
+    </div>
+
+    <!-- Register Form -->
+    <div id="register-form" class="space-y-4 hidden">
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">用户名</label>
+            <input type="text" id="register-username" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary" placeholder="请输入用户名">
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">密码</label>
+            <input type="password" id="register-password" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary" placeholder="请输入密码">
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">确认密码</label>
+            <input type="password" id="register-confirm" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary" placeholder="请再次输入密码">
+        </div>
+        <button id="register-submit" class="w-full bg-primary-500 text-white py-2 px-4 rounded-md hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary">注册</button>
+    </div>
+</div>
+
+<script>
+    // API base URL
+    const API_BASE = '/api';
+
+    // API functions
+    async function apiCall(endpoint: string, options: any = {}) {
+        const config = {
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            ...options
+        };
+
+        try {
+            const response = await fetch(`${API_BASE}${endpoint}`, config);
+            const data = await response.json();
+            
+            if (!response.ok) {
+                throw new Error(data.error || 'API request failed');
+            }
+            
+            return data;
+        } catch (error: any) {
+            console.error('API Error:', error);
+            throw error;
+        }
+    }
+
+    // Auth functions
+    async function login(username: string, password: string) {
+        try {
+            const data = await apiCall('/auth/login', {
+                method: 'POST',
+                body: JSON.stringify({ username, password })
+            });
+            
+            localStorage.setItem('authToken', data.token);
+            (window as any).showToast('登录成功！', 'success');
+            document.dispatchEvent(new CustomEvent('loginsuccess', { bubbles: true, composed: true }));
+        } catch (error: any) {
+            (window as any).showToast(error.message, 'error');
+        }
+    }
+
+    async function register(username: string, password: string) {
+        try {
+            const data = await apiCall('/auth/register', {
+                method: 'POST',
+                body: JSON.stringify({ username, password })
+            });
+            
+            localStorage.setItem('authToken', data.token);
+            (window as any).showToast('注册成功！', 'success');
+            document.dispatchEvent(new CustomEvent('loginsuccess'));
+        } catch (error: any) {
+            (window as any).showToast(error.message, 'error');
+        }
+    }
+
+    // Event listeners
+    document.addEventListener('DOMContentLoaded', function() {
+        // Auth form switching
+        const loginBtn = document.getElementById('login-btn');
+        const registerBtn = document.getElementById('register-btn');
+        const loginForm = document.getElementById('login-form');
+        const registerForm = document.getElementById('register-form');
+
+        loginBtn?.addEventListener('click', () => {
+            if (loginBtn) loginBtn.className = 'flex-1 py-2 px-4 rounded-md bg-white shadow-sm font-medium text-primary-600';
+            if (registerBtn) registerBtn.className = 'flex-1 py-2 px-4 rounded-md font-medium text-gray-600';
+            loginForm?.classList.remove('hidden');
+            registerForm?.classList.add('hidden');
+        });
+
+        registerBtn?.addEventListener('click', () => {
+            if (registerBtn) registerBtn.className = 'flex-1 py-2 px-4 rounded-md bg-white shadow-sm font-medium text-primary-600';
+            if (loginBtn) loginBtn.className = 'flex-1 py-2 px-4 rounded-md font-medium text-gray-600';
+            registerForm?.classList.remove('hidden');
+            loginForm?.classList.add('hidden');
+        });
+
+        // Login form
+        const loginSubmit = document.getElementById('login-submit');
+        loginSubmit?.addEventListener('click', async () => {
+            const usernameInput = document.getElementById('login-username') as HTMLInputElement;
+            const passwordInput = document.getElementById('login-password') as HTMLInputElement;
+            if (!usernameInput || !passwordInput) return;
+            
+            const username = usernameInput.value.trim();
+            const password = passwordInput.value;
+            
+            if (!username || !password) {
+                (window as any).showToast('请填写完整信息', 'error');
+                return;
+            }
+            
+            await login(username, password);
+        });
+
+        // Register form
+        const registerSubmit = document.getElementById('register-submit');
+        registerSubmit?.addEventListener('click', async () => {
+            const usernameInput = document.getElementById('register-username') as HTMLInputElement;
+            const passwordInput = document.getElementById('register-password') as HTMLInputElement;
+            const confirmInput = document.getElementById('register-confirm') as HTMLInputElement;
+            if (!usernameInput || !passwordInput || !confirmInput) return;
+            
+            const username = usernameInput.value.trim();
+            const password = passwordInput.value;
+            const confirm = confirmInput.value;
+            
+            if (!username || !password || !confirm) {
+                (window as any).showToast('请填写完整信息', 'error');
+                return;
+            }
+            
+            if (password !== confirm) {
+                (window as any).showToast('两次密码输入不一致', 'error');
+                return;
+            }
+            
+            await register(username, password);
+        });
+    });
+</script>

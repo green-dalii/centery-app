@@ -1,0 +1,27 @@
+{
+  "name": "centery-app",
+  "type": "module",
+  "version": "0.0.1",
+  "scripts": {
+    "dev:astro": "astro dev",
+    "dev": "astro build && wrangler dev src/index.ts --local",
+    "build": "astro build",
+    "preview": "astro build && wrangler pages dev ./dist",
+    "astro": "astro",
+    "deploy": "astro build && wrangler deploy",
+    "db:migrate": "wrangler d1 execute DB --file=./schema.sql --local"
+  },
+  "dependencies": {
+    "@astrojs/check": "^0.9.4",
+    "@iconify-json/mdi": "^1.2.3",
+    "astro": "^5.13.0",
+    "astro-icon": "^1.1.5",
+    "typescript": "^5.9.2"
+  },
+  "devDependencies": {
+    "@astrojs/tailwind": "^5.1.2",
+    "daisyui": "^5.0.50",
+    "tailwindcss": "^3.4.17",
+    "wrangler": "^4.30.0"
+  }
+}

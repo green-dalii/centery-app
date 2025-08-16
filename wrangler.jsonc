@@ -1,0 +1,22 @@
+{
+  "name": "centery-app",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-03-07",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "centery-app-db",
+      "database_id": "d40a3f15-7db1-4c18-a743-321e51ce3664"
+    }
+  ],
+  "assets": {
+    "directory": "./dist"
+  },
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  }
+}

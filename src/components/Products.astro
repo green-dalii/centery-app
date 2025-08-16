@@ -1,0 +1,355 @@
+---
+import { Icon } from 'astro-icon/components';
+---
+<div class="p-4">
+    <div class="flex items-center text-xl text-primary-600 font-bold mb-4">
+        <Icon name="mdi:store" class="w-8 h-8 mr-2" />
+        <h2>商城</h2>
+    </div>
+    <div class="mb-4 flex">
+        <input type="text" id="search-input" class="w-full px-4 py-2 border border-gray-300 rounded-l-lg focus:outline-none focus:ring-2 focus:ring-primary" placeholder="搜索商品...">
+        <button id="search-button" class="text-nowrap bg-primary-500 text-white px-4 py-2 rounded-r-lg hover:opacity-90">搜索</button>
+    </div>
+    <div id="pull-to-refresh-indicator" class="hidden text-center py-2 text-gray-500">下拉刷新商品信息</div>
+    <div id="loading-indicator" class="text-center py-10">载入中...</div>
+    <div id="products-container" class="hidden">
+      <div id="products-list" class="flex flex-col gap-4">
+        <!-- Product items will be injected here -->
+      </div>
+    </div>
+    <div id="pagination-container" class="mt-4 flex justify-center items-center space-x-2">
+        <!-- Pagination will be loaded here -->
+    </div>
+</div>
+
+<dialog id="add_to_cart_modal" class="modal">
+  <div class="modal-box">
+    <h3 id="modal-product-name" class="font-bold text-lg"></h3>
+    <p id="modal-product-price" class="py-4"></p>
+    <div class="form-control w-full max-w-xs">
+      <label class="label" for="modal-quantity-input">
+        <span class="label-text">数量</span>
+      </label>
+      <input id="modal-quantity-input" type="number" value="1" min="1" class="input input-bordered w-full max-w-xs" />
+    </div>
+    <div class="modal-action">
+      <button id="modal-add-to-cart-btn" class="btn btn-primary">加入购物车</button>
+      <form method="dialog">
+        <button class="btn">取消</button>
+      </form>
+    </div>
+  </div>
+</dialog>
+
+<script>
+    let authToken = localStorage.getItem('authToken');
+    let currentPageToken = '';
+    let hasMore = false;
+    let pageTokens: string[] = [];
+    let currentPageIndex = 0;
+    let initialY = 0;
+    let isRefreshing = false;
+
+    async function apiCall(endpoint: string, options: any = {}) {
+        const config = {
+            headers: {
+                'Content-Type': 'application/json',
+                ...(authToken && { 'Authorization': `Bearer ${authToken}` })
+            },
+            ...options
+        };
+
+        try {
+            const response = await fetch(`/api${endpoint}`, config);
+            const data = await response.json();
+            
+            if (!response.ok) {
+                throw new Error(data.error || 'API request failed');
+            }
+            
+            return data;
+        } catch (error: any) {
+            console.error('API Error:', error);
+            throw error;
+        }
+    }
+
+    async function loadProducts(pageToken = '', searchTerm = '', forceRefresh = false) {
+        const loadingIndicator = document.getElementById('loading-indicator');
+        const productsContainer = document.getElementById('products-container');
+        const productsList = document.getElementById('products-list');
+        
+        if (!isRefreshing) {
+            if (loadingIndicator) loadingIndicator.classList.remove('hidden');
+            if (productsContainer) productsContainer.classList.add('hidden');
+        }
+
+        const cacheKey = `products_${searchTerm}_${pageToken}`;
+        
+        if (!forceRefresh) {
+            const cachedData = sessionStorage.getItem(cacheKey);
+            if (cachedData) {
+                const data = JSON.parse(cachedData);
+                renderProducts(data.products);
+                hasMore = data.hasMore;
+                currentPageToken = data.nextPageToken;
+                updatePagination();
+                if (loadingIndicator) loadingIndicator.classList.add('hidden');
+                if (productsContainer) productsContainer.classList.remove('hidden');
+                return;
+            }
+        }
+
+        try {
+            const data = await apiCall(`/products?pageSize=10&pageToken=${pageToken}&q=${encodeURIComponent(searchTerm)}`);
+            sessionStorage.setItem(cacheKey, JSON.stringify(data));
+            renderProducts(data.products);
+            hasMore = data.hasMore;
+            currentPageToken = data.nextPageToken;
+            updatePagination();
+        } catch (error: any) {
+            (window as any).showToast('加载商品失败', 'error');
+            if (productsList) {
+                productsList.innerHTML = '<p class="text-center text-gray-500">加载失败，请稍后重试。</p>';
+            }
+        } finally {
+            if (loadingIndicator) loadingIndicator.classList.add('hidden');
+            if (productsContainer) productsContainer.classList.remove('hidden');
+        }
+    }
+
+    function renderProducts(products: any[]) {
+        const productsList = document.getElementById('products-list');
+        if (!productsList) return;
+        
+        if (products.length === 0) {
+            productsList.innerHTML = '<p class="text-center text-gray-500">没有找到相关商品。</p>';
+            return;
+        }
+
+        productsList.innerHTML = products.map((product: any) => `
+            <div class="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden flex items-center p-2" data-record-id="${product.id}">
+                <div class="w-20 h-20 bg-gray-200 rounded-md overflow-hidden flex-shrink-0">
+                    ${product.image ? `<img src="${product.image}" alt="${product.name}" class="lazyload w-full h-full object-cover" loading="lazy">` : ''}
+                </div>
+                <div class="pl-4 flex-1">
+                    <h3 class="font-medium text-gray-800 truncate">${product.name}</h3>
+                    <p class="text-sm text-gray-500">${product.type || '&nbsp;'}</p>
+                    <div class="flex items-baseline">
+                        <span class="text-lg font-bold text-primary-600">¥${product.price}</span>
+                        <span class="text-xs text-gray-500 ml-1">/${product.unit}</span>
+                    </div>
+                </div>
+                <button class="add-to-cart-btn bg-primary-500 text-white px-3 py-1 rounded-md text-sm hover:opacity-90 ml-4" data-product='${JSON.stringify(product)}'>
+                    加入购物车
+                </button>
+            </div>
+        `).join('');
+    }
+
+    function updatePagination() {
+        const paginationContainer = document.getElementById('pagination-container');
+        if (!paginationContainer) return;
+
+        let prevButtonHTML = `<button id="prev-page" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg" ${currentPageIndex === 0 ? 'disabled' : ''}>上一页</button>`;
+        let nextButtonHTML = `<button id="next-page" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg" ${!hasMore ? 'disabled' : ''}>下一页</button>`;
+
+        paginationContainer.innerHTML = `${prevButtonHTML} ${nextButtonHTML}`;
+
+        document.getElementById('prev-page')?.addEventListener('click', () => {
+            if (currentPageIndex > 0) {
+                currentPageIndex--;
+                loadProducts(pageTokens[currentPageIndex], (document.getElementById('search-input') as HTMLInputElement).value);
+            }
+        });
+
+        document.getElementById('next-page')?.addEventListener('click', () => {
+            if (hasMore) {
+                if (!pageTokens.includes(currentPageToken)) {
+                    pageTokens.push(currentPageToken);
+                }
+                currentPageIndex++;
+                loadProducts(currentPageToken, (document.getElementById('search-input') as HTMLInputElement).value);
+            }
+        });
+    }
+
+    interface Product {
+        id: string;
+        name: string;
+        price: number;
+        unit: string;
+        quantity?: number;
+        selected?: boolean;
+    }
+
+    function addToCart(product: Product, quantity: number = 1) {
+        let cart = JSON.parse(localStorage.getItem('cart') || '[]') as Product[];
+        const existingProduct = cart.find(item => item.id === product.id);
+
+        if (existingProduct) {
+            existingProduct.quantity = (existingProduct.quantity || 0) + quantity;
+        } else {
+            cart.push({ ...product, quantity, selected: true });
+        }
+
+        localStorage.setItem('cart', JSON.stringify(cart));
+        (window as any).showToast('已添加到购物车', 'success');
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        // Add event listener for modal add to cart button
+        const modalAddToCartBtn = document.getElementById('modal-add-to-cart-btn');
+        if (modalAddToCartBtn) {
+            modalAddToCartBtn.addEventListener('click', () => {
+                const productData = JSON.parse(modalAddToCartBtn.getAttribute('data-product') || '{}') as Product;
+                const quantityInput = document.getElementById('modal-quantity-input') as HTMLInputElement;
+                const quantity = parseInt(quantityInput.value, 10);
+
+                if (productData.id && quantity > 0) {
+                    addToCart(productData, quantity);
+                    const addToCartModal = document.getElementById('add_to_cart_modal') as HTMLDialogElement;
+                    if (addToCartModal) {
+                        addToCartModal.close();
+                    }
+                }
+            });
+        }
+        document.addEventListener('loadproducts', () => {
+            if (localStorage.getItem('authToken')) {
+                pageTokens = [''];
+                currentPageIndex = 0;
+                sessionStorage.clear(); // Clear cache on new search
+                loadProducts('', '', true);
+            }
+        });
+
+        document.getElementById('search-button')?.addEventListener('click', () => {
+            const searchTerm = (document.getElementById('search-input') as HTMLInputElement).value;
+            pageTokens = [''];
+            currentPageIndex = 0;
+            sessionStorage.clear(); // Clear cache on new search
+            loadProducts('', searchTerm, true);
+        });
+
+        document.getElementById('products-list')?.addEventListener('click', (e) => {
+            const target = e.target as HTMLElement;
+            const button = target.closest('.add-to-cart-btn');
+            if (button) {
+                const productData = JSON.parse(button.getAttribute('data-product') || '{}');
+                
+                const addToCartModal = document.getElementById('add_to_cart_modal') as any;
+                const modalProductName = document.getElementById('modal-product-name');
+                const modalProductPrice = document.getElementById('modal-product-price');
+                const modalQuantityInput = document.getElementById('modal-quantity-input') as HTMLInputElement;
+                const modalAddToCartBtn = document.getElementById('modal-add-to-cart-btn');
+
+                if (modalProductName) modalProductName.textContent = productData.name;
+                if (modalProductPrice) modalProductPrice.textContent = `¥${productData.price} / ${productData.unit}`;
+                if (modalQuantityInput) modalQuantityInput.value = '1';
+                
+                if (modalAddToCartBtn) {
+                    modalAddToCartBtn.setAttribute('data-product', button.getAttribute('data-product') || '{}');
+                }
+
+                if (addToCartModal) {
+                    addToCartModal.showModal();
+                }
+            }
+        });
+
+        const productsList = document.getElementById('products-list') as HTMLElement;
+        const pullToRefreshIndicator = document.getElementById('pull-to-refresh-indicator') as HTMLElement;
+        const container = productsList.parentElement;
+
+        container?.addEventListener('touchstart', (e) => {
+            if (container.scrollTop === 0) {
+                initialY = e.touches[0].clientY;
+                if (productsList) productsList.style.transition = 'none';
+            }
+        }, { passive: true });
+
+        container?.addEventListener('touchmove', (e) => {
+            if (container.scrollTop === 0 && initialY !== 0) {
+                const currentY = e.touches[0].clientY;
+                const diff = currentY - initialY;
+
+                if (diff > 0) {
+                    if (e.cancelable) e.preventDefault();
+                    const pullDistance = Math.min(diff, 150);
+                    if (productsList) productsList.style.transform = `translateY(${pullDistance}px)`;
+                    if (pullToRefreshIndicator) {
+                        pullToRefreshIndicator.classList.remove('hidden');
+                        pullToRefreshIndicator.style.transform = `translateY(${pullDistance}px)`;
+                    }
+
+                    if (diff > 80) {
+                        if (pullToRefreshIndicator) pullToRefreshIndicator.textContent = '松开刷新';
+                        isRefreshing = true;
+                    } else {
+                        if (pullToRefreshIndicator) pullToRefreshIndicator.textContent = '下拉刷新商品信息';
+                        isRefreshing = false;
+                    }
+                }
+            }
+        });
+
+        container?.addEventListener('touchend', () => {
+            if (initialY === 0) return;
+
+            if (productsList) {
+                productsList.style.transition = 'transform 0.3s';
+                productsList.style.transform = 'translateY(0)';
+            }
+            if (pullToRefreshIndicator) {
+                pullToRefreshIndicator.style.transition = 'transform 0.3s';
+                pullToRefreshIndicator.style.transform = 'translateY(0)';
+            }
+
+            if (isRefreshing) {
+                if (pullToRefreshIndicator) {
+                    pullToRefreshIndicator.textContent = '正在刷新...';
+                }
+                const searchTerm = (document.getElementById('search-input') as HTMLInputElement).value;
+                pageTokens = [''];
+                currentPageIndex = 0;
+                sessionStorage.clear();
+                loadProducts('', searchTerm, true).finally(() => {
+                    if (pullToRefreshIndicator) {
+                        pullToRefreshIndicator.classList.add('hidden');
+                        pullToRefreshIndicator.textContent = '下拉刷新商品信息';
+                    }
+                });
+            } else {
+                if (pullToRefreshIndicator) {
+                    pullToRefreshIndicator.classList.add('hidden');
+                }
+            }
+            
+            initialY = 0;
+            isRefreshing = false;
+        });
+    });
+
+    document.addEventListener('tabswitched', (event: any) => {
+        if (event.detail.tab === 'products') {
+            const cacheKey = 'products__';
+            const cachedData = sessionStorage.getItem(cacheKey);
+            if (!cachedData) {
+                pageTokens = [''];
+                currentPageIndex = 0;
+                loadProducts('', '', true);
+            } else {
+                const data = JSON.parse(cachedData);
+                renderProducts(data.products);
+                hasMore = data.hasMore;
+                currentPageToken = data.nextPageToken;
+                updatePagination();
+                const loadingIndicator = document.getElementById('loading-indicator');
+                const productsContainer = document.getElementById('products-container');
+                if (loadingIndicator) loadingIndicator.classList.add('hidden');
+                if (productsContainer) productsContainer.classList.remove('hidden');
+            }
+        }
+    });
+</script>

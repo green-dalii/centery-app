@@ -1,0 +1,72 @@
+--- 
+import Layout from '../layouts/Layout.astro';
+import Auth from '../components/Auth.astro';
+import Products from '../components/Products.astro';
+import Profile from '../components/Profile.astro';
+import Cart from '../components/Cart.astro';
+---
+
+<Layout title="Centery - 智慧鑫诚在线下单助手">
+    <main class="pb-20">
+        <div id="auth-tab" class="page-content">
+            <Auth />
+        </div>
+        <div id="products-tab" class="page-content hidden">
+            <Products />
+        </div>
+        <div id="profile-tab" class="page-content hidden">
+            <Profile />
+        </div>
+        <div id="cart-tab" class="page-content hidden">
+            <Cart />
+        </div>
+    </main>
+</Layout>
+
+<script>
+    import '../styles/global.css';
+    // App state
+    let authToken: string | null = localStorage.getItem('authToken');
+
+    function switchTab(tabName: string) {
+        // Hide all tabs
+        document.querySelectorAll('.page-content').forEach(tab => {
+            tab.classList.add('hidden');
+        });
+        
+        // Show selected tab
+        const targetTab = document.getElementById(`${tabName}-tab`);
+        if (targetTab) targetTab.classList.remove('hidden');
+
+        // Notify nav component
+        document.dispatchEvent(new CustomEvent('tabswitched', { detail: { tab: tabName } }));
+    }
+
+    // Event listeners
+    document.addEventListener('DOMContentLoaded', function() {
+        // Handle tab changes from nav
+        document.addEventListener('tabchange', (event: any) => {
+            const tab = event.detail.tab;
+            if (!authToken) {
+                (window as any).showToast('请先登录', 'error');
+                switchTab('auth');
+                return;
+            }
+            switchTab(tab);
+        });
+
+        // Handle login success
+        document.addEventListener('loginsuccess', () => {
+            authToken = localStorage.getItem('authToken');
+            switchTab('products');
+            document.dispatchEvent(new CustomEvent('loadproducts'));
+        });
+
+        // Initialize app
+        if (authToken) {
+            switchTab('products');
+        } else {
+            switchTab('auth');
+        }
+    });
+</script>

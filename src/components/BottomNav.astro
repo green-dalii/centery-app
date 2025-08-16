@@ -1,0 +1,53 @@
+--- 
+import { Icon } from 'astro-icon/components';
+---
+<nav class="fixed bottom-0 left-1/2 transform -translate-x-1/2 w-full max-w-md bg-white border-t border-secondary-200">
+    <div class="flex">
+        <button class="nav-btn flex-1 py-3 px-4 text-center text-primary-600" data-tab="products">
+            <Icon name="mdi:store" class="w-6 h-6 mx-auto" />
+            <div class="text-xs">商城</div>
+        </button>
+        <button class="nav-btn flex-1 py-3 px-4 text-center text-secondary-500" data-tab="cart">
+            <Icon name="mdi:cart" class="w-6 h-6 mx-auto" />
+            <div class="text-xs">购物车</div>
+        </button>
+        <button class="nav-btn flex-1 py-3 px-4 text-center text-secondary-500" data-tab="profile">
+            <Icon name="mdi:account" class="w-6 h-6 mx-auto" />
+            <div class="text-xs">我的</div>
+        </button>
+    </div>
+</nav>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const navButtons = document.querySelectorAll('.nav-btn');
+
+        function switchNavTab(tabName: string) {
+            // Update nav buttons
+            navButtons.forEach(btn => {
+                if (btn.getAttribute('data-tab') === tabName) {
+                    btn.classList.add('text-primary-600');
+                    btn.classList.remove('text-secondary-500');
+                } else {
+                    btn.classList.remove('text-primary-600');
+                    btn.classList.add('text-secondary-500');
+                }
+            });
+        }
+
+        navButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const tab = btn.getAttribute('data-tab');
+                if (!tab) return;
+
+                // Dispatch a custom event to notify the page
+                document.dispatchEvent(new CustomEvent('tabchange', { detail: { tab } }));
+            });
+        });
+
+        // Listen for external tab changes
+        document.addEventListener('tabswitched', (event: any) => {
+            switchNavTab(event.detail.tab);
+        });
+    });
+</script>

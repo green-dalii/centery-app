@@ -1,0 +1,179 @@
+---
+import Toast from './Toast.astro';
+import { Icon } from 'astro-icon/components';
+---
+
+<div id="cart-container" class="p-4">
+  <div class="flex items-center text-xl text-primary-600 font-bold mb-4">
+    <Icon name="mdi:cart" class="w-8 h-8 mr-2" />
+    <h2>购物车</h2>
+  </div>
+  <div id="cart-items" class="space-y-4">
+    <!-- Cart items will be injected here by JavaScript -->
+  </div>
+  <div class="fixed bottom-16 left-0 right-0 bg-white p-4 border-t">
+    <div class="container max-w-md mx-auto">
+      <div class="flex justify-between items-center">
+        <div>
+          <input type="checkbox" id="select-all" class="mr-2" />
+          <label for="select-all">全选</label>
+        </div>
+        <div class="text-lg text-primary-600 font-bold">
+          总价: ￥<span id="total-price">0.00</span>
+        </div>
+        <button id="checkout" class="bg-primary-500 text-white px-6 py-2 rounded-lg">下单</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  interface CartItem {
+    id: string;
+    name: string;
+    image: string;
+    price: number;
+    unit: string;
+    quantity: number;
+    selected: boolean;
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const cartContainer = document.getElementById('cart-container');
+    if (!cartContainer) return;
+
+    const cartItemsContainer = document.getElementById('cart-items');
+    const totalPriceEl = document.getElementById('total-price');
+    const selectAllCheckbox = document.getElementById('select-all') as HTMLInputElement;
+    const checkoutButton = document.getElementById('checkout');
+
+    let cart: CartItem[] = [];
+
+    function getCart(): CartItem[] {
+      return JSON.parse(localStorage.getItem('cart') || '[]');
+    }
+
+    function saveCart() {
+      localStorage.setItem('cart', JSON.stringify(cart));
+    }
+
+    function renderCart() {
+      if (!cartItemsContainer) return;
+      cart = getCart();
+      
+      if (cart.length === 0) {
+        cartItemsContainer.innerHTML = '<p class="text-center text-gray-500">购物车是空的</p>';
+        updateTotalPrice();
+        return;
+      }
+
+      cartItemsContainer.innerHTML = '';
+      cart.forEach((item, index) => {
+        const itemElement = document.createElement('div');
+        itemElement.className = 'flex items-center justify-between p-4 border rounded-lg bg-white';
+        itemElement.innerHTML = `
+          <div class="flex items-center">
+            <input type="checkbox" class="item-checkbox mr-4" data-index="${index}" ${item.selected ? 'checked' : ''}>
+            <img src="${item.image}" alt="${item.name}" class="w-16 h-16 object-cover mr-4 rounded-md">
+            <div class="flex-grow">
+              <h3 class="font-bold">${item.name}</h3>
+              <p class="text-sm text-gray-600">￥${item.price}/${item.unit}</p>
+            </div>
+          </div>
+          <div class="flex items-center">
+            <button class="px-2 py-1 bg-gray-200 rounded decrease-quantity" data-index="${index}">-</button>
+            <span class="mx-4">${item.quantity}</span>
+            <button class="px-2 py-1 bg-gray-200 rounded increase-quantity" data-index="${index}">+</button>
+            <button class="ml-4 text-red-500 remove-item" data-index="${index}">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-trash-2"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
+            </button>
+          </div>
+        `;
+        cartItemsContainer.appendChild(itemElement);
+      });
+      updateTotalPrice();
+      updateSelectAllCheckbox();
+    }
+
+    function updateTotalPrice() {
+      let totalPrice = 0;
+      cart.forEach(item => {
+        if (item.selected) {
+          totalPrice += item.price * item.quantity;
+        }
+      });
+      if(totalPriceEl) {
+        totalPriceEl.textContent = totalPrice.toFixed(2);
+      }
+    }
+
+    function updateSelectAllCheckbox() {
+      if (selectAllCheckbox) {
+        selectAllCheckbox.checked = cart.length > 0 && cart.every(item => item.selected);
+      }
+    }
+
+    cartItemsContainer?.addEventListener('click', (e) => {
+      const target = e.target as HTMLElement;
+      const button = target.closest('button') as HTMLButtonElement | null;
+      const checkbox = target.closest('input[type="checkbox"]') as HTMLInputElement | null;
+
+      if (button) {
+        const index = parseInt(button.dataset.index || '');
+        if (isNaN(index)) return;
+
+        if (button.classList.contains('increase-quantity')) {
+          cart[index].quantity++;
+        } else if (button.classList.contains('decrease-quantity')) {
+          if (cart[index].quantity > 1) {
+            cart[index].quantity--;
+          } else {
+            cart.splice(index, 1);
+          }
+        } else if (button.classList.contains('remove-item')) {
+          cart.splice(index, 1);
+        }
+        saveCart();
+        renderCart();
+      }
+
+      if (checkbox && checkbox.classList.contains('item-checkbox')) {
+        const index = parseInt(checkbox.dataset.index || '');
+        if (isNaN(index)) return;
+        cart[index].selected = checkbox.checked;
+        saveCart();
+        updateTotalPrice();
+        updateSelectAllCheckbox();
+      }
+    });
+
+    selectAllCheckbox?.addEventListener('change', () => {
+      const checked = selectAllCheckbox.checked;
+      cart.forEach(item => item.selected = checked);
+      saveCart();
+      renderCart();
+    });
+
+    checkoutButton?.addEventListener('click', () => {
+      const itemsToCheckout = cart.filter(item => item.selected);
+      if (itemsToCheckout.length === 0) {
+        (window as any).showToast('请选择要下单的商品', 'error');
+        return;
+      }
+      // In a real app, you would proceed to the checkout process here.
+      (window as any).showToast(`成功提交 ${itemsToCheckout.length} 种商品`, 'success');
+    });
+
+    // Listen for tab changes to render the cart
+    document.addEventListener('tabswitched', (event: any) => {
+        if (event.detail.tab === 'cart') {
+            renderCart();
+        }
+    });
+
+    // Initial render if the cart tab is active
+    if (cartContainer.offsetParent !== null) {
+      renderCart();
+    }
+  });
+</script>
