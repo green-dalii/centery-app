@@ -50,30 +50,45 @@ import { Icon } from 'astro-icon/components';
 </div>
 
 <!-- Address Modal -->
-<div id="address-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
-    <div class="bg-white rounded-lg p-6 w-full max-w-sm m-4">
-        <h3 id="modal-title" class="text-lg font-medium mb-4">添加新地址</h3>
-        <form id="address-form">
+<dialog id="address-modal" class="modal">
+    <div class="modal-box">
+        <form method="dialog">
+            <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>
+        </form>
+        <h3 id="modal-title" class="font-bold text-lg mb-4">添加新地址</h3>
+        <form id="address-form" class="space-y-4">
             <input type="hidden" id="address-id">
-            <div class="mb-4">
-                <label for="recipient-name" class="block text-sm font-medium text-gray-700">收件人</label>
-                <input type="text" id="recipient-name" name="recipient_name" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500" required>
-                    </div>
-                    <div class="mb-4">
-                        <label for="phone" class="block text-sm font-medium text-gray-700">联系电话</label>
-                        <input type="tel" id="phone" name="phone" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500" required>
-                    </div>
-                    <div class="mb-4">
-                        <label for="address" class="block text-sm font-medium text-gray-700">详细地址</label>
-                        <textarea id="address" name="address" rows="3" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500" required></textarea>
+            <div class="form-control">
+                <label class="label">
+                    <span class="label-text">收件人</span>
+                </label>
+                <input type="text" id="recipient-name" name="recipient_name" class="input input-bordered w-full" required>
             </div>
-            <div class="flex justify-end space-x-2">
-                <button type="button" id="cancel-btn" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">取消</button>
-                <button type="submit" class="px-4 py-2 bg-primary-500 text-white rounded-md hover:bg-primary-dark">保存</button>
+            <div class="form-control">
+                <label class="label">
+                    <span class="label-text">联系电话</span>
+                </label>
+                <input type="tel" id="phone" name="phone" class="input input-bordered w-full" required>
+            </div>
+            <div class="form-control">
+                <label class="label">
+                    <span class="label-text">详细地址</span>
+                </label>
+                <textarea id="address" name="address" rows="3" class="textarea textarea-bordered w-full" required></textarea>
+            </div>
+            <div class="form-control">
+                <label class="label cursor-pointer">
+                    <span class="label-text">设为默认地址</span>
+                    <input type="checkbox" id="is_default" name="is_default" class="checkbox checkbox-primary" />
+                </label>
+            </div>
+            <div class="modal-action">
+                <button type="button" class="btn btn-ghost" id="cancel-address-modal-btn">取消</button>
+                <button type="submit" class="btn btn-primary">保存</button>
             </div>
         </form>
     </div>
-</div>
+</dialog>
 
 <style>
     .filter-btn {
@@ -227,7 +242,10 @@ import { Icon } from 'astro-icon/components';
             <div class="border-t pt-3">
                 <div class="flex justify-between items-start">
                     <div>
-                        <p class="font-semibold">${addr.recipient_name} <span class="font-normal text-gray-600 ml-2">${addr.phone}</span></p>
+                        <div class="flex items-center">
+                            <p class="font-semibold">${addr.recipient_name} <span class="font-normal text-gray-600 ml-2">${addr.phone}</span></p>
+                            ${addr.is_default ? '<span class="ml-2 px-2 py-0.5 text-xs bg-primary-100 text-primary-700 rounded-full">默认</span>' : ''}
+                        </div>
                         <p class="text-sm text-gray-600 mt-1">${addr.address}</p>
                     </div>
                     <div class="flex space-x-2">
@@ -274,7 +292,7 @@ import { Icon } from 'astro-icon/components';
     }
 
     function openAddressModal(address: any = null) {
-        const modal = document.getElementById('address-modal');
+        const modal = document.getElementById('address-modal') as HTMLDialogElement;
         const form = document.getElementById('address-form') as HTMLFormElement;
         const modalTitle = document.getElementById('modal-title');
         
@@ -285,25 +303,29 @@ import { Icon } from 'astro-icon/components';
         (document.getElementById('recipient-name') as HTMLInputElement).value = address ? address.recipient_name : '';
         (document.getElementById('phone') as HTMLInputElement).value = address ? address.phone : '';
         (document.getElementById('address') as HTMLTextAreaElement).value = address ? address.address : '';
+        (document.getElementById('is_default') as HTMLInputElement).checked = address ? address.is_default : false;
         modalTitle.textContent = address ? '编辑地址' : '添加新地址';
 
-        modal.classList.remove('hidden');
-        modal.classList.add('flex');
+        modal.showModal();
     }
 
     function closeAddressModal() {
-        const modal = document.getElementById('address-modal');
+        const modal = document.getElementById('address-modal') as HTMLDialogElement;
         if (!modal) return;
-        modal.classList.add('hidden');
-        modal.classList.remove('flex');
+        modal.close();
     }
 
     async function handleAddressFormSubmit(e: Event) {
         e.preventDefault();
         const form = e.target as HTMLFormElement;
         const id = (form.querySelector('#address-id') as HTMLInputElement).value;
-        const formData = new FormData(form);
-        const data = Object.fromEntries(formData.entries());
+
+        const data = {
+            recipient_name: (form.querySelector('#recipient-name') as HTMLInputElement).value,
+            phone: (form.querySelector('#phone') as HTMLInputElement).value,
+            address: (form.querySelector('#address') as HTMLTextAreaElement).value,
+            is_default: (form.querySelector('#is_default') as HTMLInputElement).checked
+        };
 
         const method = id ? 'PUT' : 'POST';
         const endpoint = id ? `/user/addresses/${id}` : '/user/addresses';
@@ -354,8 +376,8 @@ import { Icon } from 'astro-icon/components';
 
         // Address modal listeners
         document.getElementById('add-address-btn')?.addEventListener('click', () => openAddressModal());
-        document.getElementById('cancel-btn')?.addEventListener('click', closeAddressModal);
         document.getElementById('address-form')?.addEventListener('submit', handleAddressFormSubmit);
+        document.getElementById('cancel-address-modal-btn')?.addEventListener('click', closeAddressModal);
 
         loadProfile();
     });

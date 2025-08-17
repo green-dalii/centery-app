@@ -158,25 +158,41 @@ async function createAddress(request: Request, userId: number, env: Env): Promis
       });
     }
 
-    // 如果设置为默认地址，先取消其他默认地址
-    if (is_default) {
-      await env.DB.prepare(
-        'UPDATE addresses SET is_default = FALSE WHERE user_id = ?'
-      ).bind(userId).run();
+    const batch = [];
+
+    // 检查用户是否已有地址
+    const { count } = await env.DB.prepare(
+      'SELECT COUNT(*) as count FROM addresses WHERE user_id = ?'
+    ).bind(userId).first();
+
+    let newAddressIsDefault = is_default;
+    // 如果是第一个地址，强制设为默认
+    if (count === 0) {
+      newAddressIsDefault = true;
+    } else if (newAddressIsDefault) {
+      // 如果设置为默认地址，先取消其他默认地址
+      batch.push(
+        env.DB.prepare('UPDATE addresses SET is_default = FALSE WHERE user_id = ?').bind(userId)
+      );
     }
 
-    const result = await env.DB.prepare(
-      'INSERT INTO addresses (user_id, recipient_name, phone, address, is_default) VALUES (?, ?, ?, ?, ?)'
-    ).bind(userId, recipient_name, phone, address, is_default || false).run();
+    batch.push(
+      env.DB.prepare(
+        'INSERT INTO addresses (user_id, recipient_name, phone, address, is_default) VALUES (?, ?, ?, ?, ?)'
+      ).bind(userId, recipient_name, phone, address, newAddressIsDefault || false)
+    );
+    
+    const results = await env.DB.batch(batch);
 
-    if (!result.success) {
+    const lastResult = results[results.length - 1];
+    if (!lastResult.success) {
       throw new Error('Failed to create address');
     }
 
     return new Response(JSON.stringify({
       success: true,
       message: '收货地址添加成功',
-      addressId: result.meta.last_row_id
+      addressId: lastResult.meta.last_row_id
     }), {
       status: 201,
       headers: { 'Content-Type': 'application/json' },
@@ -209,20 +225,35 @@ async function updateAddress(request: Request, userId: number, addressId: number
       });
     }
 
-    // 如果设置为默认地址，先取消其他默认地址
-    if (is_default) {
-      await env.DB.prepare(
-        'UPDATE addresses SET is_default = FALSE WHERE user_id = ? AND id != ?'
-      ).bind(userId, addressId).run();
+    // 检查用户是否只有一个地址
+    const { count } = await env.DB.prepare(
+      'SELECT COUNT(*) as count FROM addresses WHERE user_id = ?'
+    ).bind(userId).first();
+
+    let newAddressIsDefault = is_default;
+    if (count === 1 && !is_default) {
+      // 如果是唯一地址，则不允许取消默认
+      return new Response(JSON.stringify({ error: '无法取消唯一地址的默认设置' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    } 
+
+    const batch = [];
+    if (newAddressIsDefault) {
+      // 如果设置为默认地址，先取消其他默认地址
+      batch.push(
+        env.DB.prepare('UPDATE addresses SET is_default = FALSE WHERE user_id = ? AND id != ?').bind(userId, addressId)
+      );
     }
 
-    const result = await env.DB.prepare(
-      'UPDATE addresses SET recipient_name = ?, phone = ?, address = ?, is_default = ? WHERE id = ? AND user_id = ?'
-    ).bind(recipient_name, phone, address, is_default || false, addressId, userId).run();
+    batch.push(
+      env.DB.prepare(
+        'UPDATE addresses SET recipient_name = ?, phone = ?, address = ?, is_default = ? WHERE id = ? AND user_id = ?'
+      ).bind(recipient_name, phone, address, newAddressIsDefault || false, addressId, userId)
+    );
 
-    if (!result.success) {
-      throw new Error('Failed to update address');
-    }
+    await env.DB.batch(batch);
 
     return new Response(JSON.stringify({
       success: true,
@@ -245,15 +276,44 @@ async function updateAddress(request: Request, userId: number, addressId: number
  */
 async function deleteAddress(userId: number, addressId: number, env: Env): Promise<Response> {
   try {
-    const result = await env.DB.prepare(
-      'DELETE FROM addresses WHERE id = ? AND user_id = ?'
-    ).bind(addressId, userId).run();
+    // 检查被删除的地址是否是默认地址
+    const addressToDelete = await env.DB.prepare(
+      'SELECT is_default FROM addresses WHERE id = ? AND user_id = ?'
+    ).bind(addressId, userId).first();
 
-    if (!result.success || result.meta.changes === 0) {
+    if (!addressToDelete) {
       return new Response(JSON.stringify({ error: '地址不存在或无权限' }), {
         status: 404,
         headers: { 'Content-Type': 'application/json' },
       });
+    }
+
+    const wasDefault = addressToDelete.is_default;
+
+    const deleteResult = await env.DB.prepare(
+      'DELETE FROM addresses WHERE id = ? AND user_id = ?'
+    ).bind(addressId, userId).run();
+
+    if (!deleteResult.success || deleteResult.meta.changes === 0) {
+        // This case should technically be caught by the check above, but for safety:
+      return new Response(JSON.stringify({ error: '地址不存在或无权限' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    // 如果删除的是默认地址，则需要设置新的默认地址
+    if (wasDefault) {
+      const remainingAddresses = await env.DB.prepare(
+        'SELECT id FROM addresses WHERE user_id = ? ORDER BY created_at DESC'
+      ).bind(userId).all();
+
+      if (remainingAddresses.results && remainingAddresses.results.length > 0) {
+        const newDefaultAddressId = remainingAddresses.results[0].id;
+        await env.DB.prepare(
+          'UPDATE addresses SET is_default = TRUE WHERE id = ?'
+        ).bind(newDefaultAddressId).run();
+      }
     }
 
     return new Response(JSON.stringify({

@@ -27,6 +27,30 @@ import { Icon } from 'astro-icon/components';
   </div>
 </div>
 
+<!-- Order Confirmation Modal -->
+<dialog id="order-confirmation-modal" class="modal">
+  <div class="modal-box">
+    <h3 class="font-bold text-lg">确认订单</h3>
+    <p class="py-4">请再次确认订单项目和收货地址</p>
+    <div id="address-selection-container">
+      <label class="form-control w-full">
+        <div class="label">
+          <span class="label-text">收货地址</span>
+        </div>
+        <select id="address-select" class="select select-bordered"></select>
+      </label>
+    </div>
+    <div id="no-address-message" class="hidden">
+      <p>您还没有添加收货地址，请先到个人中心添加地址。</p>
+      <a href="/" class="btn btn-primary mt-4">前往个人中心</a>
+    </div>
+    <div class="modal-action">
+      <button id="cancel-order-btn" class="btn">取消</button>
+      <button id="confirm-order-btn" class="btn btn-primary">确认下单</button>
+    </div>
+  </div>
+</dialog>
+
 <script>
   interface CartItem {
     id: string;
@@ -47,6 +71,12 @@ import { Icon } from 'astro-icon/components';
     const totalPriceEl = document.getElementById('total-price');
     const selectAllCheckbox = document.getElementById('select-all') as HTMLInputElement;
     const checkoutButton = document.getElementById('checkout');
+    const orderConfirmationModal = document.getElementById('order-confirmation-modal') as HTMLDialogElement;
+    const addressSelect = document.getElementById('address-select') as HTMLSelectElement;
+    const addressSelectionContainer = document.getElementById('address-selection-container');
+    const noAddressMessage = document.getElementById('no-address-message');
+    const confirmOrderBtn = document.getElementById('confirm-order-btn') as HTMLButtonElement;
+    const cancelOrderBtn = document.getElementById('cancel-order-btn');
 
     let cart: CartItem[] = [];
 
@@ -187,14 +217,141 @@ import { Icon } from 'astro-icon/components';
       renderCart();
     });
 
-    checkoutButton?.addEventListener('click', () => {
+    checkoutButton?.addEventListener('click', async () => {
       const itemsToCheckout = cart.filter(item => item.selected);
       if (itemsToCheckout.length === 0) {
         (window as any).showToast('请选择要下单的商品', 'error');
         return;
       }
-      // In a real app, you would proceed to the checkout process here.
-      (window as any).showToast(`成功提交 ${itemsToCheckout.length} 种商品`, 'success');
+      await openOrderConfirmationModal();
+    });
+
+    async function openOrderConfirmationModal() {
+      try {
+        const token = localStorage.getItem('authToken');
+        if (!token) {
+          // Redirect to login or show message if not authenticated
+          window.location.href = '/'; // Or show a login modal
+          return;
+        }
+
+        const response = await fetch('/api/user/addresses', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        if (response.status === 401) {
+            (window as any).showToast('请先登录', 'error');
+            localStorage.removeItem('authToken');
+            window.location.href = '/';
+            return;
+        }
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch addresses');
+        }
+        const data = await response.json();
+        const addresses = data.addresses;
+
+        if (addresses.length === 0) {
+          addressSelectionContainer?.classList.add('hidden');
+          noAddressMessage?.classList.remove('hidden');
+          confirmOrderBtn?.classList.add('btn-disabled');
+        } else {
+          addressSelectionContainer?.classList.remove('hidden');
+          noAddressMessage?.classList.add('hidden');
+          confirmOrderBtn?.classList.remove('btn-disabled');
+
+          addressSelect.innerHTML = '';
+          addresses.forEach((addr: any) => {
+            const option = document.createElement('option');
+            option.value = addr.id;
+            option.textContent = `${addr.recipient_name}, ${addr.phone}, ${addr.address}`;
+            if (addr.is_default) {
+              option.selected = true;
+            }
+            addressSelect.appendChild(option);
+          });
+        }
+        orderConfirmationModal?.showModal();
+      } catch (error) {
+        console.error('Error fetching addresses:', error);
+        (window as any).showToast('获取地址失败', 'error');
+      }
+    }
+
+    function closeOrderConfirmationModal() {
+      orderConfirmationModal?.close();
+    }
+
+    cancelOrderBtn?.addEventListener('click', closeOrderConfirmationModal);
+
+    confirmOrderBtn?.addEventListener('click', async () => {
+      const selectedAddressId = addressSelect.value;
+      if (!selectedAddressId) {
+        (window as any).showToast('请选择收货地址', 'error');
+        return;
+      }
+
+      const itemsToCheckout = cart.filter(item => item.selected);
+      if (itemsToCheckout.length === 0) {
+        (window as any).showToast('请选择要下单的商品', 'error');
+        return;
+      }
+
+      // Stock validation
+      for (const item of itemsToCheckout) {
+        if (item.quantity > item.stock) {
+          (window as any).showToast(`${item.name} 库存不足`, 'error');
+          return;
+        }
+      }
+
+      const originalButtonContent = confirmOrderBtn?.innerHTML;
+      if (confirmOrderBtn) {
+        confirmOrderBtn.disabled = true;
+        confirmOrderBtn.innerHTML = `<span class="loading loading-spinner loading-sm"></span> 下单中...`;
+      }
+
+      try {
+        const token = localStorage.getItem('authToken');
+        const response = await fetch('/api/orders', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            items: itemsToCheckout.map(item => ({ id: item.id, quantity: item.quantity })),
+            addressId: selectedAddressId
+          })
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.success) {
+          (window as any).showToast('订单创建成功！', 'success');
+          // Clear selected items from cart
+          cart = cart.filter(item => !item.selected);
+          saveCart();
+          renderCart();
+          closeOrderConfirmationModal();
+          // Dispatch an event to notify product list to refresh
+          document.dispatchEvent(new CustomEvent('orderplaced'));
+        } else {
+          throw new Error(data.error || '创建订单失败');
+        }
+      } catch (error: any) {
+        console.error('Error creating order:', error);
+        const errorMessage = error.message || '创建订单失败，请稍后再试';
+        (window as any).showToast(errorMessage, 'error');
+      } finally {
+        if (confirmOrderBtn) {
+          confirmOrderBtn.disabled = false;
+          confirmOrderBtn.innerHTML = originalButtonContent || '确认下单';
+        }
+      }
     });
 
     // Listen for tab changes to render the cart

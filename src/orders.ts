@@ -5,6 +5,8 @@
 
 import type { Env } from './index';
 import { requireAuth } from './auth';
+import { callFeishuBitableApi } from './utils/feishu';
+import { v4 as uuidv4 } from 'uuid';
 
 /**
  * 处理订单相关请求
@@ -39,22 +41,14 @@ export async function handleOrders(request: Request, env: Env, path: string): Pr
 
 /**
  * 创建订单
- * TODO: 集成飞书多维表格API
  */
 async function createOrder(request: Request, user: { userId: number; username: string }, env: Env): Promise<Response> {
   try {
-    const { productId, quantity, addressId } = await request.json();
+    const { items, addressId } = await request.json();
 
     // 验证输入
-    if (!productId || !quantity || !addressId) {
-      return new Response(JSON.stringify({ error: '商品ID、数量和收货地址不能为空' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
-
-    if (quantity <= 0) {
-      return new Response(JSON.stringify({ error: '商品数量必须大于0' }), {
+    if (!items || !Array.isArray(items) || items.length === 0 || !addressId) {
+      return new Response(JSON.stringify({ error: '订单项目和收货地址不能为空' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
       });
@@ -62,8 +56,8 @@ async function createOrder(request: Request, user: { userId: number; username: s
 
     // 验证收货地址是否属于当前用户
     const address = await env.DB.prepare(
-      'SELECT id, recipient_name, phone, address FROM addresses WHERE id = ? AND user_id = ?'
-    ).bind(addressId, user.userId).first();
+      'SELECT recipient_name, phone, address FROM addresses WHERE id = ? AND user_id = ?'
+    ).bind(addressId, user.userId).first<{ recipient_name: string; phone: string; address: string }>();
 
     if (!address) {
       return new Response(JSON.stringify({ error: '收货地址不存在或无权限' }), {
@@ -73,33 +67,30 @@ async function createOrder(request: Request, user: { userId: number; username: s
     }
 
     // TODO: 验证商品库存（从飞书获取）
-    // TODO: 将订单信息写入飞书多维表格
-    
-    // 暂时生成模拟订单ID
-    const orderId = `order_${Date.now()}_${user.userId}`;
-    const orderData = {
-      orderId,
-      userId: user.userId,
-      username: user.username,
-      productId,
-      quantity,
-      address: {
-        recipientName: address.recipient_name,
-        phone: address.phone,
-        address: address.address
-      },
-      status: 'pending',
-      createdAt: new Date().toISOString()
-    };
 
-    // TODO: 实际写入飞书表格
-    console.log('Order created (mock):', orderData);
+    const orderId = uuidv4(); // 生成唯一订单号
+
+    const records = items.map((item: any) => ({
+      fields: {
+        '订单号': orderId,
+        '商品名称': [item.id],
+        '订单状态': '已下单',
+        '用户名称': user.username,
+        '订购数量': item.quantity,
+        '收货人': address.recipient_name,
+        '联系方式': address.phone,
+        '收货地址': address.address,
+      },
+    }));
+
+    await callFeishuBitableApi(env, 'POST', `/tables/${env.FEISHU_ORDER_TABLE_ID}/records/batch_create`, {
+      records,
+    });
 
     return new Response(JSON.stringify({
       success: true,
       message: '订单创建成功',
       orderId,
-      order: orderData
     }), {
       status: 201,
       headers: { 'Content-Type': 'application/json' },

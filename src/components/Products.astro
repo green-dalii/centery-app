@@ -415,6 +415,13 @@ import { Icon } from 'astro-icon/components';
         });
     });
 
+    document.addEventListener('orderplaced', () => {
+        sessionStorage.clear();
+        pageTokens = [''];
+        currentPageIndex = 0;
+        loadProducts('', '', true);
+    });
+
     document.addEventListener('tabswitched', (event: any) => {
         if (event.detail.tab === 'products') {
             const cacheKey = 'products__';

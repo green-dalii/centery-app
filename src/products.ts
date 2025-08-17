@@ -4,6 +4,7 @@
  */
 
 import type { Env } from './index';
+import { callFeishuBitableApi } from './utils/feishu';
 
 /**
  * 处理商品相关请求
@@ -57,28 +58,9 @@ async function getProducts(request: Request, env: Env): Promise<Response> {
  */
 async function getProductById(productId: string, env: Env): Promise<Response> {
   try {
-    const token = await getFeishuAccessToken(env);
-    const response = await fetch(`https://open.feishu.cn/open-apis/bitable/v1/apps/${env.FEISHU_BASE_APP_TOKEN}/tables/${env.FEISHU_TABLE_ID}/records/${productId}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json; charset=utf-8'
-        }
-      });
+    const data = await callFeishuBitableApi(env, 'GET', `/tables/${env.FEISHU_STOCK_TABLE_ID}/records/${productId}`);
     
-    const data = await response.json();
-
-    if (data.code !== 0) {
-        if (data.code === 254404) { // RecordIdNotFound
-             return new Response(JSON.stringify({ error: '商品不存在' }), {
-                status: 404,
-                headers: { 'Content-Type': 'application/json' },
-            });
-        }
-        throw new Error(`Failed to fetch product by id from Feishu: ${data.msg}`);
-    }
-    
-    const item = data.data.record;
+    const item = data.record;
     const fields = item.fields;
     const imageUrl = fields['商品图片'] && fields['商品图片'][0] ? fields['商品图片'][0].url : '';
 
@@ -100,7 +82,13 @@ async function getProductById(productId: string, env: Env): Promise<Response> {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
     });
-  } catch (error) {
+  } catch (error: any) {
+    if (error.message.includes('code: 254404')) { // RecordIdNotFound
+        return new Response(JSON.stringify({ error: '商品不存在' }), {
+           status: 404,
+           headers: { 'Content-Type': 'application/json' },
+       });
+   }
     console.error('Get product by id error:', error);
     return new Response(JSON.stringify({ error: '获取商品详情失败' }), {
       status: 500,
@@ -110,38 +98,9 @@ async function getProductById(productId: string, env: Env): Promise<Response> {
 }
 
 /**
- * 飞书API集成函数（待实现）
- */
-
-/**
- * 获取飞书 tenant_access_token
- */
-async function getFeishuAccessToken(env: Env): Promise<string> {
-  const response = await fetch('https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json; charset=utf-8'
-    },
-    body: JSON.stringify({
-      app_id: env.FEISHU_APP_ID,
-      app_secret: env.FEISHU_APP_SECRET
-    })
-  });
-
-  const data = await response.json();
-  if (data.code !== 0) {
-    throw new Error(`Failed to get tenant_access_token: ${data.msg}`);
-  }
-  return data.tenant_access_token;
-}
-
-
-/**
  * 从飞书多维表格获取商品数据
  */
 async function fetchProductsFromFeishu(env: Env, pageToken?: string, pageSize?: number, searchTerm?: string): Promise<{ products: any[], hasMore: boolean, nextPageToken: string }> {
-  const token = await getFeishuAccessToken(env);
-
   const body: {
     page_size?: number;
     page_token?: string;
@@ -166,23 +125,10 @@ async function fetchProductsFromFeishu(env: Env, pageToken?: string, pageSize?: 
     }
   }
 
-
-  const response = await fetch(`https://open.feishu.cn/open-apis/bitable/v1/apps/${env.FEISHU_BASE_APP_TOKEN}/tables/${env.FEISHU_TABLE_ID}/records/search`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json; charset=utf-8'
-    },
-    body: JSON.stringify(body)
-  });
-
-  const data = await response.json();
-  if (data.code !== 0) {
-    throw new Error(`Failed to fetch products from Feishu: ${data.msg}`);
-  }
+  const data = await callFeishuBitableApi(env, 'POST', `/tables/${env.FEISHU_STOCK_TABLE_ID}/records/search`, body);
 
   // 将飞书返回的原始数据格式化为我们需要的商品数据格式
-  const products = data.data.items.map((item: any) => {
+  const products = data.items.map((item: any) => {
     const fields = item.fields;
     const imageUrl = fields['商品图片'] && fields['商品图片'][0] ? `/api/image_proxy?file_token=${fields['商品图片'][0].file_token}` : '';
 
@@ -200,8 +146,8 @@ async function fetchProductsFromFeishu(env: Env, pageToken?: string, pageSize?: 
 
   return {
       products,
-      hasMore: data.data.has_more,
-      nextPageToken: data.data.page_token || ''
+      hasMore: data.has_more,
+      nextPageToken: data.page_token || ''
   };
 }
 
@@ -249,4 +195,26 @@ export async function handleImageProxy(request: Request, env: Env): Promise<Resp
     console.error('Image proxy error:', error);
     return new Response('Failed to fetch image', { status: 500 });
   }
+}
+
+/**
+ * 获取飞书 tenant_access_token
+ */
+async function getFeishuAccessToken(env: Env): Promise<string> {
+  const response = await fetch('https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json; charset=utf-8'
+    },
+    body: JSON.stringify({
+      app_id: env.FEISHU_APP_ID,
+      app_secret: env.FEISHU_APP_SECRET
+    })
+  });
+
+  const data = await response.json();
+  if (data.code !== 0) {
+    throw new Error(`Failed to get tenant_access_token: ${data.msg}`);
+  }
+  return data.tenant_access_token;
 }

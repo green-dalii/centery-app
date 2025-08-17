@@ -14,7 +14,8 @@ export interface Env {
   FEISHU_APP_ID: string;
   FEISHU_APP_SECRET: string;
   FEISHU_BASE_APP_TOKEN: string;
-  FEISHU_TABLE_ID: string;
+  FEISHU_STOCK_TABLE_ID: string;
+  FEISHU_ORDER_TABLE_ID: string;
   // Cloudflare bindings
   DB: any; // D1Database type from @cloudflare/workers-types
 }
