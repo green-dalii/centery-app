@@ -213,26 +213,38 @@ export async function handleImageProxy(request: Request, env: Env): Promise<Resp
     return new Response('Missing file_token', { status: 400 });
   }
 
+  const cache = (caches as any).default;
+  const cacheKey = new Request(url.toString(), request);
+  let response = await cache.match(cacheKey);
+
+  if (response) {
+    return response;
+  }
+
   try {
     const accessToken = await getFeishuAccessToken(env);
-    const response = await fetch(`https://open.feishu.cn/open-apis/drive/v1/medias/${fileToken}/download`, {
+    const feishuResponse = await fetch(`https://open.feishu.cn/open-apis/drive/v1/medias/${fileToken}/download`, {
       headers: {
         'Authorization': `Bearer ${accessToken}`
       }
     });
 
-    if (!response.ok) {
-      throw new Error(`Failed to download image from Feishu: ${response.statusText}`);
+    if (!feishuResponse.ok) {
+      throw new Error(`Failed to download image from Feishu: ${feishuResponse.statusText}`);
     }
 
-    const imageBlob = await response.blob();
-    const headers = new Headers();
-    headers.set('Content-Type', response.headers.get('Content-Type') || 'application/octet-stream');
+    const newHeaders = new Headers(feishuResponse.headers);
+    newHeaders.set('Cache-Control', 'public, max-age=86400'); // Cache for 24 hours
 
-    return new Response(imageBlob, {
-      status: 200,
-      headers: headers
+    response = new Response(feishuResponse.body, {
+      status: feishuResponse.status,
+      statusText: feishuResponse.statusText,
+      headers: newHeaders
     });
+
+    await cache.put(cacheKey, response.clone());
+
+    return response;
   } catch (error) {
     console.error('Image proxy error:', error);
     return new Response('Failed to fetch image', { status: 500 });

@@ -33,5 +33,18 @@ export default {
       },
     },
   },
-  plugins: [require('daisyui')],
+  plugins: [
+    require('daisyui'),
+  ],
+  daisyui: {
+    themes: [
+      {
+        light: {
+          "primary": "#16a34a",
+          "secondary": "#4b5563",
+        },
+      },
+    ],
+    darkTheme: false,
+  },
 }

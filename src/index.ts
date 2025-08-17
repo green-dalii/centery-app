@@ -38,9 +38,13 @@ export default {
 
     // API 路由处理
     if (path.startsWith('/api/')) {
-      const response = await handleApiRequest(request, env, path);
+      const originalResponse = await handleApiRequest(request, env, path);
+      // 克隆响应以使 headers 可变
+      const response = new Response(originalResponse.body, originalResponse);
       // 添加 CORS 头
       response.headers.set('Access-Control-Allow-Origin', '*');
+      response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+      response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
       return response;
     }
 

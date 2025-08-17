@@ -1,20 +1,38 @@
-<div id="toast" class="fixed top-4 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-4 py-2 rounded-md shadow-lg z-50 hidden">
-    <span id="toast-message"></span>
+<div id="toast-container" class="toast toast-center toast-middle z-50">
+    <!-- Toasts will be dynamically added here -->
 </div>
 
 <script>
 // Utility functions
 function showToast(message: string, type: string = 'info') {
-    const toast = document.getElementById('toast');
-    const toastMessage = document.getElementById('toast-message');
-    if (!toast || !toastMessage) return;
+    const toastContainer = document.getElementById('toast-container');
+    if (!toastContainer) return;
+
+    const toast = document.createElement('div');
+    toast.className = `alert ${
+        type === 'error' ? 'alert-error' : type === 'success' ? 'alert-success' : 'alert-info'
+    }`;
     
-    toastMessage.textContent = message;
-    toast.className = `fixed top-4 left-1/2 transform -translate-x-1/2 px-4 py-2 rounded-md shadow-lg z-50 ${
-        type === 'error' ? 'bg-red-500' : type === 'success' ? 'bg-green-500' : 'bg-gray-800'
-    } text-white`;
-    toast.classList.remove('hidden');
-    setTimeout(() => toast?.classList.add('hidden'), 3000);
+    const icon = document.createElement('span');
+    if (type === 'success') {
+        icon.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`;
+    } else if (type === 'error') {
+        icon.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`;
+    } else {
+        icon.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-info shrink-0 w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`;
+    }
+
+    const messageSpan = document.createElement('span');
+    messageSpan.textContent = message;
+
+    toast.appendChild(icon);
+    toast.appendChild(messageSpan);
+
+    toastContainer.appendChild(toast);
+
+    setTimeout(() => {
+        toast.remove();
+    }, 3000);
 }
 
 // Make it globally available
