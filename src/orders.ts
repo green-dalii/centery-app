@@ -57,7 +57,7 @@ async function createOrder(request: Request, user: { userId: number; username: s
     // 验证收货地址是否属于当前用户
     const address = await env.DB.prepare(
       'SELECT recipient_name, phone, address FROM addresses WHERE id = ? AND user_id = ?'
-    ).bind(addressId, user.userId).first<{ recipient_name: string; phone: string; address: string }>();
+    ).bind(addressId, user.userId).first() as { recipient_name: string; phone: string; address: string } | null;
 
     if (!address) {
       return new Response(JSON.stringify({ error: '收货地址不存在或无权限' }), {
@@ -106,54 +106,139 @@ async function createOrder(request: Request, user: { userId: number; username: s
 
 /**
  * 获取用户订单列表
- * TODO: 从飞书多维表格获取
+ * 从飞书多维表格获取
  */
 async function getUserOrders(request: Request, user: { userId: number; username: string }, env: Env): Promise<Response> {
   try {
-    // 暂时返回模拟数据
-    const mockOrders = [
-      {
-        id: `order_${Date.now() - 86400000}_${user.userId}`,
-        productId: 'prod_001',
-        productName: '精选苹果',
-        quantity: 2,
-        total: 25.6,
-        status: 'completed', // 已完成
-        created_at: new Date(Date.now() - 86400000).toISOString(),
+    // 从飞书多维表格查询订单记录
+    const searchResult = await callFeishuBitableApi(env, 'POST', `/tables/${env.FEISHU_ORDER_TABLE_ID}/records/search`, {
+      field_names: [
+        '订单号',
+        '订单状态', 
+        '商品名称',
+        '订购数量',
+        '订单金额',
+        '下单时间',
+        '收货人',
+        '联系方式',
+        '收货地址'
+      ],
+      filter: {
+        conjunction: 'and',
+        conditions: [
+          {
+            field_name: '用户名称',
+            operator: 'is',
+            value: [user.username]
+          }
+        ]
       },
-      {
-        id: `order_${Date.now() - 172800000}_${user.userId}`,
-        productId: 'prod_002',
-        productName: '有机香蕉',
-        quantity: 1,
-        total: 8.5,
-        status: 'shipped', // 待收货
-        created_at: new Date(Date.now() - 172800000).toISOString(),
-      },
-      {
-        id: `order_${Date.now() - 259200000}_${user.userId}`,
-        productId: 'prod_003',
-        productName: '新鲜草莓',
-        quantity: 3,
-        total: 45.0,
-        status: 'processing', // 待发货
-        created_at: new Date(Date.now() - 259200000).toISOString(),
-      },
-      {
-        id: `order_${Date.now() - 345600000}_${user.userId}`,
-        productId: 'prod_004',
-        productName: '进口蓝莓',
-        quantity: 1,
-        total: 30.0,
-        status: 'pending', // 已下单
-        created_at: new Date(Date.now() - 345600000).toISOString(),
+      sort: [
+        {
+          field_name: '下单时间',
+          desc: true
+        }
+      ]
+    });
+
+    // 按订单号聚合数据
+    const orderMap = new Map();
+    
+    if (searchResult.items && searchResult.items.length > 0) {
+      for (const record of searchResult.items) {
+        const fields = record.fields;
+        
+        // 解析订单号 - 处理数组格式
+        const orderIdField = fields['订单号'];
+        const orderId = Array.isArray(orderIdField) ? orderIdField[0]?.text : orderIdField;
+        
+        if (!orderId) continue;
+        
+        if (!orderMap.has(orderId)) {
+          // 映射飞书状态到前端状态
+          const feishuStatus = fields['订单状态'];
+          let frontendStatus = 'pending';
+          
+          switch (feishuStatus) {
+            case '已下单':
+              frontendStatus = 'pending';
+              break;
+            case '审核中':
+              frontendStatus = 'processing';
+              break;
+            case '发货中':
+              frontendStatus = 'shipped';
+              break;
+            case '已签收':
+              frontendStatus = 'received';
+              break;
+            case '已结算':
+              frontendStatus = 'completed';
+              break;
+            case '已取消':
+              frontendStatus = 'cancelled';
+              break;
+            default:
+              frontendStatus = 'pending';
+          }
+          
+          // 解析收货人 - 处理数组格式
+          const recipientField = fields['收货人'];
+          const recipientName = Array.isArray(recipientField) ? recipientField[0]?.text : recipientField;
+          
+          // 解析收货地址 - 处理数组格式
+          const addressField = fields['收货地址'];
+          const address = Array.isArray(addressField) ? addressField[0]?.text : addressField;
+          
+          // 解析下单时间 - 处理时间戳
+          const createdTime = fields['下单时间'];
+          const createdAt = createdTime ? new Date(createdTime).toISOString() : new Date().toISOString();
+          
+          orderMap.set(orderId, {
+            id: orderId,
+            status: frontendStatus,
+            items: [],
+            total: 0,
+            created_at: createdAt,
+            address: {
+              recipient_name: recipientName || '',
+              phone: fields['联系方式'] || '',
+              address: address || ''
+            }
+          });
+        }
+        
+        // 添加商品项到订单
+        const order = orderMap.get(orderId);
+        
+        // 解析商品名称 - 处理link_record_ids格式
+        const productNameField = fields['商品名称'];
+        const productId = productNameField?.link_record_ids?.[0] || 'unknown';
+        
+        // 解析订购数量
+        const quantity = parseInt(fields['订购数量']) || 1;
+        
+        // 解析订单金额 - 处理复杂对象格式
+        const amountField = fields['订单金额'];
+        const amount = amountField?.value?.[0] || 0;
+        
+        order.items.push({
+          productId,
+          quantity,
+          amount
+        });
+        
+        order.total += amount;
       }
-    ];
+    }
+    
+    // 转换为数组格式
+    const orders = Array.from(orderMap.values());
 
     return new Response(JSON.stringify({
       success: true,
-      orders: mockOrders,
-      total: mockOrders.length
+      orders: orders,
+      total: orders.length
     }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },

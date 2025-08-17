@@ -29,7 +29,9 @@ import { Icon } from 'astro-icon/components';
                 <button class="btn btn-soft filter-btn" data-status="pending">已下单</button>
                 <button class="btn btn-soft filter-btn" data-status="processing">待发货</button>
                 <button class="btn btn-soft filter-btn" data-status="shipped">待收货</button>
-                <button class="btn btn-soft filter-btn" data-status="completed">已完成</button>
+                <button class="btn btn-soft filter-btn" data-status="received">已签收</button>
+                <button class="btn btn-soft filter-btn" data-status="completed">已结算</button>
+                <button class="btn btn-soft filter-btn" data-status="cancelled">已取消</button>
                 <button class="btn btn-soft filter-btn" data-status="all">全部订单</button>
             </div>
             <div id="orders-list" class="space-y-3">
@@ -185,7 +187,9 @@ import { Icon } from 'astro-icon/components';
         pending: '已下单',
         processing: '待发货',
         shipped: '待收货',
-        completed: '已完成'
+        received: '已签收',
+        completed: '已结算',
+        cancelled: '已取消'
     };
 
     function renderOrders() {
@@ -206,22 +210,62 @@ import { Icon } from 'astro-icon/components';
             return;
         }
 
-        ordersList.innerHTML = filteredOrders.map((order: any) => `
-            <div class="bg-base-300 rounded-lg p-4 shadow-sm">
-                <div class="flex justify-between items-start mb-2">
-                    <span class="text-sm text-gray-600">订单号: ${order.id}</span>
-                    <span class="text-sm font-medium px-2 py-1 rounded-full ${
-                        order.status === 'pending' ? 'bg-blue-100 text-blue-800' :
-                        order.status === 'processing' ? 'bg-yellow-100 text-yellow-800' :
-                        order.status === 'shipped' ? 'bg-orange-100 text-orange-800' :
-                        order.status === 'completed' ? 'bg-green-100 text-green-800' :
-                        'bg-gray-100 text-gray-800'
-                    }">${orderStatusMap[order.status] || order.status}</span>
+        ordersList.innerHTML = filteredOrders.map((order: any) => {
+            // 获取商品信息
+            const itemsHtml = order.items ? order.items.map((item: any) => {
+                // 从sessionStorage获取商品信息
+                let productName = `商品ID: ${item.productId}`;
+                
+                try {
+                    // 尝试从不同的缓存键获取商品数据
+                    const cachedData = sessionStorage.getItem('products__');
+                    if (cachedData) {
+                        const data = JSON.parse(cachedData);
+                        const product = data.products?.find((p: any) => p.id === item.productId);
+                        if (product && product.name) {
+                            productName = product.name;
+                        }
+                    }
+                } catch (e) {
+                    console.warn('获取商品信息失败:', e);
+                }
+                
+                return `
+                    <div class="flex justify-between items-center text-xs">
+                        <span>${productName} × ${item.quantity}</span>
+                        <span class="font-medium">¥${(typeof item.amount === 'number' ? item.amount : parseFloat(item.amount) || 0).toFixed(2)}</span>
+                    </div>
+                `;
+            }).join('') : '';
+            
+            return `
+                <div class="bg-base-300 rounded-lg p-4 shadow-sm">
+                    <div class="flex justify-between items-start mb-2">
+                        <span class="text-xs text-gray-600">订单号: ${order.id}</span>
+                        <span class="text-xs text-nowrap font-medium px-2 py-1 rounded-full ${
+                            order.status === 'pending' ? 'bg-blue-100 text-blue-800' :
+                            order.status === 'processing' ? 'bg-yellow-100 text-yellow-800' :
+                            order.status === 'shipped' ? 'bg-orange-100 text-orange-800' :
+                            order.status === 'received' ? 'bg-purple-100 text-purple-800' :
+                            order.status === 'completed' ? 'bg-green-100 text-green-800' :
+                            order.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                            'bg-gray-100 text-gray-800'
+                        }">${orderStatusMap[order.status] || order.status}</span>
+                    </div>
+                    ${itemsHtml ? `<div class="mb-2 space-y-1">${itemsHtml}</div>` : ''}
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-lg font-semibold text-primary">总计: ¥${order.total.toFixed(2)}</span>
+                        <span class="text-xs text-gray-500">${new Date(order.created_at).toLocaleString()}</span>
+                    </div>
+                    ${order.address ? `
+                        <div class="text-xs text-gray-600 border-t pt-2">
+                            <div>收货人: ${order.address.recipient_name} ${order.address.phone}</div>
+                            <div>地址: ${order.address.address}</div>
+                        </div>
+                    ` : ''}
                 </div>
-                <div class="text-lg font-semibold text-gray-800 mb-1">¥${order.total}</div>
-                <div class="text-sm text-gray-500">${new Date(order.created_at).toLocaleString()}</div>
-            </div>
-        `).join('');
+            `;
+        }).join('');
     }
 
     async function loadOrders() {
