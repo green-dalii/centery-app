@@ -14,22 +14,31 @@ interface JWTPayload {
 }
 
 /**
- * Base64 URL编码
+ * UTF-8安全的Base64 URL编码
  */
 function base64UrlEncode(str: string): string {
-  return btoa(str)
+  // 先将字符串转换为UTF-8字节，然后进行base64编码
+  const utf8Bytes = new TextEncoder().encode(str);
+  const binaryString = Array.from(utf8Bytes, byte => String.fromCharCode(byte)).join('');
+  return btoa(binaryString)
     .replace(/\+/g, '-')
     .replace(/\//g, '_')
     .replace(/=/g, '');
 }
 
 /**
- * Base64 URL解码
+ * UTF-8安全的Base64 URL解码
  */
 function base64UrlDecode(str: string): string {
   // 补齐padding
   str += '='.repeat((4 - str.length % 4) % 4);
-  return atob(str.replace(/-/g, '+').replace(/_/g, '/'));
+  const binaryString = atob(str.replace(/-/g, '+').replace(/_/g, '/'));
+  // 将二进制字符串转换回UTF-8字符串
+  const utf8Bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    utf8Bytes[i] = binaryString.charCodeAt(i);
+  }
+  return new TextDecoder().decode(utf8Bytes);
 }
 
 /**

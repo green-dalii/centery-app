@@ -2,35 +2,35 @@
 import { Icon } from 'astro-icon/components';
 ---
 <div class="p-4">
-    <div class="flex items-center text-base text-primary-600 font-bold mb-4">
+    <div class="flex items-center text-base text-primary font-bold mb-4">
         <Icon name="mdi:account" class="text-xl mr-2" />
         <h2>我的</h2>
     </div>
     <div class="mb-6">
         <div class="flex items-center justify-between space-x-4 mb-4">
             <div class="flex items-center space-x-4">
-                <div class="w-16 h-16 bg-primary-500 rounded-full flex items-center justify-center">
-                    <span class="text-white text-xl font-bold" id="user-avatar">U</span>
+                <div class="w-16 h-16 bg-primary rounded-full flex items-center justify-center">
+                    <span class="text-primary-content text-xl font-bold" id="user-avatar">U</span>
                 </div>
                 <div>
-                    <h3 class="font-semibold text-gray-800" id="user-name">用户名</h3>
-                    <p class="text-sm text-gray-600">欢迎使用Centery</p>
+                    <h3 class="font-semibold text-base-content" id="user-name">用户名</h3>
+                    <p class="text-sm text-base-content/60">欢迎使用Centery</p>
                 </div>
             </div>
-            <button id="logout-btn" class="bg-red-500 text-white py-2 px-4 rounded-md hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500">退出登录</button>
+            <button id="logout-btn" class="btn btn-error">退出登录</button>
         </div>
     </div>
 
     <div class="space-y-4">
         <!-- Orders Section -->
-        <div class="bg-white rounded-lg border border-gray-200 p-4">
-            <h4 class="font-medium text-gray-800 mb-3">我的订单</h4>
+        <div class="bg-base-200 rounded-lg border border-base-300 p-4">
+            <h4 class="font-medium text-base-content mb-3">我的订单</h4>
             <div id="order-filters" class="flex space-x-2 mb-4 overflow-x-auto pb-2">
-                <button class="filter-btn" data-status="pending">已下单</button>
-                <button class="filter-btn" data-status="processing">待发货</button>
-                <button class="filter-btn" data-status="shipped">待收货</button>
-                <button class="filter-btn" data-status="completed">已完成</button>
-                <button class="filter-btn" data-status="all">全部订单</button>
+                <button class="btn btn-soft filter-btn" data-status="pending">已下单</button>
+                <button class="btn btn-soft filter-btn" data-status="processing">待发货</button>
+                <button class="btn btn-soft filter-btn" data-status="shipped">待收货</button>
+                <button class="btn btn-soft filter-btn" data-status="completed">已完成</button>
+                <button class="btn btn-soft filter-btn" data-status="all">全部订单</button>
             </div>
             <div id="orders-list" class="space-y-3">
                 <!-- Orders will be loaded here -->
@@ -38,12 +38,12 @@ import { Icon } from 'astro-icon/components';
         </div>
 
         <!-- Addresses Section -->
-        <div class="bg-white rounded-lg border border-gray-200 p-4">
-            <h4 class="font-medium text-gray-800 mb-3">地址管理</h4>
+        <div class="bg-base-200 rounded-lg border border-base-300 p-4">
+            <h4 class="font-medium text-base-content mb-3">地址管理</h4>
             <div id="addresses-list" class="space-y-3">
                 <!-- Addresses will be loaded here -->
             </div>
-            <button id="add-address-btn" class="mt-3 text-primary-600 text-sm font-medium w-full border border-primary-500 rounded-md py-2 hover:bg-primary-500 hover:text-white transition-colors">+ 添加新地址</button>
+            <button id="add-address-btn" class="btn btn-outline btn-primary w-full mt-3">+ 添加新地址</button>
         </div>
 
     </div>
@@ -92,19 +92,8 @@ import { Icon } from 'astro-icon/components';
 
 <style>
     .filter-btn {
-        padding: 0.5rem 1rem;
-        border-radius: 9999px;
-        border: 1px solid #e5e7eb;
-        background-color: #f9fafb;
-        color: #374151;
         font-size: 0.875rem;
         white-space: nowrap;
-        transition: all 0.2s;
-    }
-    .filter-btn.active {
-        background-color: theme('colors.primary.500');
-        color: white;
-        border-color: theme('colors.primary.600');
     }
 </style>
 
@@ -167,11 +156,28 @@ import { Icon } from 'astro-icon/components';
             updateUI();
             loadOrders();
             loadAddresses();
+            
+            // Initialize button states
+            initializeFilterButtons();
         } catch (error) {
             console.error("Failed to load profile", error);
             currentUser = null;
             updateUI();
         }
+    }
+    
+    function initializeFilterButtons() {
+        const filterContainer = document.getElementById('order-filters');
+        if (!filterContainer) return;
+        
+        const allButtons = filterContainer.querySelectorAll('.filter-btn');
+        allButtons.forEach((btn, index) => {
+            if (index === 0) { // First button ("全部") should be active by default
+                btn.className = 'filter-btn btn btn-soft btn-primary active';
+            } else {
+                btn.className = 'filter-btn btn btn-soft';
+            }
+        });
     }
 
     // --- Order Logic ---
@@ -201,7 +207,7 @@ import { Icon } from 'astro-icon/components';
         }
 
         ordersList.innerHTML = filteredOrders.map((order: any) => `
-            <div class="bg-gray-50 rounded-lg border border-gray-200 p-4 shadow-sm">
+            <div class="bg-base-300 rounded-lg p-4 shadow-sm">
                 <div class="flex justify-between items-start mb-2">
                     <span class="text-sm text-gray-600">订单号: ${order.id}</span>
                     <span class="text-sm font-medium px-2 py-1 rounded-full ${
@@ -367,8 +373,17 @@ import { Icon } from 'astro-icon/components';
         filterContainer?.addEventListener('click', (e) => {
             const target = e.target as HTMLElement;
             if (target.classList.contains('filter-btn')) {
-                filterContainer.querySelector('.active')?.classList.remove('active');
+                // Remove active state from all buttons
+                const allButtons = filterContainer.querySelectorAll('.filter-btn');
+                allButtons.forEach(btn => {
+                    btn.classList.remove('active', 'btn-primary');
+                    btn.className = 'filter-btn btn btn-soft';
+                });
+                
+                // Add active state to clicked button
                 target.classList.add('active');
+                target.className = 'filter-btn btn btn-soft btn-primary active';
+                
                 currentFilter = target.dataset.status || 'all';
                 renderOrders();
             }

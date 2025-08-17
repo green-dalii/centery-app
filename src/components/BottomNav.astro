@@ -1,17 +1,17 @@
 --- 
 import { Icon } from 'astro-icon/components';
 ---
-<nav class="fixed bottom-0 left-1/2 transform -translate-x-1/2 w-full bg-white border-t border-secondary-200">
+<nav class="fixed bottom-0 left-1/2 transform -translate-x-1/2 w-full bg-base-100 border-t border-base-300">
     <div class="flex">
-        <button class="nav-btn flex-1 py-3 px-4 text-center text-primary-600" data-tab="products">
+        <button class="nav-btn flex-1 py-3 px-4 text-center text-primary" data-tab="products">
             <Icon name="mdi:store" class="w-6 h-6 mx-auto" />
             <div class="text-xs">商城</div>
         </button>
-        <button class="nav-btn flex-1 py-3 px-4 text-center text-secondary-500" data-tab="cart">
+        <button class="nav-btn flex-1 py-3 px-4 text-center text-base-content/60" data-tab="cart">
             <Icon name="mdi:cart" class="w-6 h-6 mx-auto" />
             <div class="text-xs">购物车</div>
         </button>
-        <button class="nav-btn flex-1 py-3 px-4 text-center text-secondary-500" data-tab="profile">
+        <button class="nav-btn flex-1 py-3 px-4 text-center text-base-content/60" data-tab="profile">
             <Icon name="mdi:account" class="w-6 h-6 mx-auto" />
             <div class="text-xs">我的</div>
         </button>
@@ -26,11 +26,11 @@ import { Icon } from 'astro-icon/components';
             // Update nav buttons
             navButtons.forEach(btn => {
                 if (btn.getAttribute('data-tab') === tabName) {
-                    btn.classList.add('text-primary-600');
-                    btn.classList.remove('text-secondary-500');
+                    btn.classList.add('text-primary');
+                    btn.classList.remove('text-base-content/60');
                 } else {
-                    btn.classList.remove('text-primary-600');
-                    btn.classList.add('text-secondary-500');
+                    btn.classList.remove('text-primary');
+                    btn.classList.add('text-base-content/60');
                 }
             });
         }

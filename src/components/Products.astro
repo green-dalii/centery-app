@@ -1,16 +1,23 @@
 ---
 import { Icon } from 'astro-icon/components';
 ---
-<div class="p-4">
-    <div class="flex items-center text-base text-primary-600 font-bold mb-4">
-        <Icon name="mdi:store" class="text-xl mr-2" />
-        <h2>智慧鑫诚商城</h2>
+<div class="relative">
+    <div class="sticky top-14 bg-base-100 z-20 p-4 border-b border-base-200">
+        <div class="flex items-center justify-between text-base text-primary font-bold mb-4">
+            <div class="flex items-center">
+                <Icon name="mdi:store" class="text-xl mr-2" />
+                <h2>智慧鑫诚商城</h2>
+            </div>
+            <button id="refresh-button" class="btn btn-ghost btn-sm p-2" title="刷新商品">
+                <Icon name="mdi:refresh" class="text-lg" />
+            </button>
+        </div>
+        <div class="flex">
+            <input type="text" id="search-input" class="input input-bordered flex-1 rounded-r-none" placeholder="搜索商品...">
+            <button id="search-button" class="btn btn-primary text-nowrap rounded-l-none">搜索</button>
+        </div>
     </div>
-    <div class="mb-4 flex">
-        <input type="text" id="search-input" class="w-full px-4 py-2 border border-gray-300 rounded-l-lg focus:outline-none focus:ring-2 focus:ring-primary" placeholder="搜索商品...">
-        <button id="search-button" class="text-nowrap bg-primary-500 text-white px-4 py-2 rounded-r-lg hover:opacity-90">搜索</button>
-    </div>
-    <div id="pull-to-refresh-indicator" class="hidden text-center py-2 text-gray-500">下拉刷新商品信息</div>
+    <div class="p-4 pt-0">
     <div id="loading-indicator" class="text-center py-10">载入中...</div>
     <div id="products-container" class="hidden">
       <div id="products-list" class="flex flex-col gap-4">
@@ -19,6 +26,7 @@ import { Icon } from 'astro-icon/components';
     </div>
     <div id="pagination-container" class="mt-4 flex justify-center items-center space-x-2">
         <!-- Pagination will be loaded here -->
+    </div>
     </div>
 </div>
 
@@ -145,20 +153,20 @@ import { Icon } from 'astro-icon/components';
             const productForButton = { ...product, stock: stockValue };
 
             return `
-            <div class="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden flex items-center p-2" data-record-id="${product.id}">
-                <div class="w-20 h-20 bg-gray-200 rounded-md overflow-hidden flex-shrink-0">
+            <div class="bg-base-200 rounded-lg border border-base-300 shadow-sm overflow-hidden flex items-center p-2" data-record-id="${product.id}">
+                <div class="w-20 h-20 bg-base-200 rounded-md overflow-hidden flex-shrink-0">
                     ${product.image ? `<img src="${product.image}" alt="${product.name}" class="lazyload w-full h-full object-cover" loading="lazy">` : ''}
                 </div>
                 <div class="pl-4 flex-1">
-                    <h3 class="font-medium text-gray-800 truncate">${product.name}</h3>
-                    <p class="text-sm text-gray-500">${product.type || '&nbsp;'}</p>
+                    <h3 class="font-medium text-base-content truncate">${product.name}</h3>
+                    <p class="text-xs text-base-content/50">${product.type || '&nbsp;'}</p>
                     <div class="flex items-baseline">
-                        <span class="text-lg font-bold text-primary-600">¥${product.price}</span>
-                        <span class="text-xs text-gray-500 ml-1">/${product.unit}</span>
+                        <span class="text-lg font-bold text-primary">¥${product.price}</span>
+                        <span class="text-xs text-base-content/70 ml-1">/${product.unit}</span>
                     </div>
                 </div>
                 <button 
-                    class="add-to-cart-btn ${isOutOfStock ? 'bg-gray-400 cursor-not-allowed' : 'bg-primary-500 hover:opacity-90'} text-white px-3 py-1 rounded-md text-sm ml-4" 
+                    class="add-to-cart-btn ${isOutOfStock ? 'bg-base-300 cursor-not-allowed text-base-content' : 'bg-primary hover:opacity-90 text-white'} px-3 py-1 rounded-md text-sm ml-4" 
                     data-product='${JSON.stringify(productForButton)}'
                     ${isOutOfStock ? 'disabled' : ''}
                 >
@@ -172,8 +180,8 @@ import { Icon } from 'astro-icon/components';
         const paginationContainer = document.getElementById('pagination-container');
         if (!paginationContainer) return;
 
-        let prevButtonHTML = `<button id="prev-page" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg" ${currentPageIndex === 0 ? 'disabled' : ''}>上一页</button>`;
-        let nextButtonHTML = `<button id="next-page" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg" ${!hasMore ? 'disabled' : ''}>下一页</button>`;
+        let prevButtonHTML = `<button id="prev-page" class="btn btn-sm" ${currentPageIndex === 0 ? 'disabled' : ''}>上一页</button>`;
+        let nextButtonHTML = `<button id="next-page" class="btn btn-sm" ${!hasMore ? 'disabled' : ''}>下一页</button>`;
 
         paginationContainer.innerHTML = `${prevButtonHTML} ${nextButtonHTML}`;
 
@@ -342,76 +350,13 @@ import { Icon } from 'astro-icon/components';
             }
         });
 
-        const productsList = document.getElementById('products-list') as HTMLElement;
-        const pullToRefreshIndicator = document.getElementById('pull-to-refresh-indicator') as HTMLElement;
-        const container = productsList.parentElement;
-
-        container?.addEventListener('touchstart', (e) => {
-            if (container.scrollTop === 0) {
-                initialY = e.touches[0].clientY;
-                if (productsList) productsList.style.transition = 'none';
-            }
-        }, { passive: true });
-
-        container?.addEventListener('touchmove', (e) => {
-            if (container.scrollTop === 0 && initialY !== 0) {
-                const currentY = e.touches[0].clientY;
-                const diff = currentY - initialY;
-
-                if (diff > 0) {
-                    if (e.cancelable) e.preventDefault();
-                    const pullDistance = Math.min(diff, 150);
-                    if (productsList) productsList.style.transform = `translateY(${pullDistance}px)`;
-                    if (pullToRefreshIndicator) {
-                        pullToRefreshIndicator.classList.remove('hidden');
-                        pullToRefreshIndicator.style.transform = `translateY(${pullDistance}px)`;
-                    }
-
-                    if (diff > 80) {
-                        if (pullToRefreshIndicator) pullToRefreshIndicator.textContent = '松开刷新';
-                        isRefreshing = true;
-                    } else {
-                        if (pullToRefreshIndicator) pullToRefreshIndicator.textContent = '下拉刷新商品信息';
-                        isRefreshing = false;
-                    }
-                }
-            }
-        });
-
-        container?.addEventListener('touchend', () => {
-            if (initialY === 0) return;
-
-            if (productsList) {
-                productsList.style.transition = 'transform 0.3s';
-                productsList.style.transform = 'translateY(0)';
-            }
-            if (pullToRefreshIndicator) {
-                pullToRefreshIndicator.style.transition = 'transform 0.3s';
-                pullToRefreshIndicator.style.transform = 'translateY(0)';
-            }
-
-            if (isRefreshing) {
-                if (pullToRefreshIndicator) {
-                    pullToRefreshIndicator.textContent = '正在刷新...';
-                }
-                const searchTerm = (document.getElementById('search-input') as HTMLInputElement).value;
-                pageTokens = [''];
-                currentPageIndex = 0;
-                sessionStorage.clear();
-                loadProducts('', searchTerm, true).finally(() => {
-                    if (pullToRefreshIndicator) {
-                        pullToRefreshIndicator.classList.add('hidden');
-                        pullToRefreshIndicator.textContent = '下拉刷新商品信息';
-                    }
-                });
-            } else {
-                if (pullToRefreshIndicator) {
-                    pullToRefreshIndicator.classList.add('hidden');
-                }
-            }
-            
-            initialY = 0;
-            isRefreshing = false;
+        // 添加刷新按钮事件监听器
+        document.getElementById('refresh-button')?.addEventListener('click', () => {
+            const searchTerm = (document.getElementById('search-input') as HTMLInputElement).value;
+            pageTokens = [''];
+            currentPageIndex = 0;
+            sessionStorage.clear();
+            loadProducts('', searchTerm, true);
         });
     });
 
