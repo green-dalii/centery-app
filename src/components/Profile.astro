@@ -174,11 +174,7 @@ import { Icon } from 'astro-icon/components';
         
         const allButtons = filterContainer.querySelectorAll('.filter-btn');
         allButtons.forEach((btn, index) => {
-            if (index === 0) { // First button ("全部") should be active by default
-                btn.className = 'filter-btn btn btn-soft btn-primary active';
-            } else {
-                btn.className = 'filter-btn btn btn-soft';
-            }
+            btn.className = 'filter-btn btn btn-soft';
         });
     }
 

@@ -180,3 +180,5 @@ build/
 # Cloudflare specific
 .dev.vars
 wrangler.toml.bak
+wrangler.toml
+wrangler.jsonc

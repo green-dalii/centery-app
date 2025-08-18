@@ -15,7 +15,43 @@ import "../styles/global.css"
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{title}</title>
+    
+    <!-- Favicon and Icons -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon.svg" />
+    
+    <!-- PWA Configuration -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="application-name" content="Centery App" />
+    <meta name="apple-mobile-web-app-title" content="Centery App" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    
+    <!-- Theme Colors -->
+    <meta name="theme-color" content="#00c850" />
+    <meta name="msapplication-TileColor" content="#00c850" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    
+    <!-- SEO Meta Tags -->
+    <meta name="description" content="Centery App - 智慧鑫诚在线下单助手" />
+    <meta name="keywords" content="购物,订单管理,商品浏览,移动应用" />
+    <meta name="author" content="GreenerAI" />
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content="Centery App - 智慧鑫诚在线下单助手" />
+    <meta property="og:image" content="/favicon.svg" />
+    
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta property="twitter:title" content={title} />
+    <meta property="twitter:description" content="Centery App - 智慧鑫诚在线下单助手" />
+    <meta property="twitter:image" content="/favicon.svg" />
+    
     <meta name="generator" content={Astro.generator} />
     <style>
         /* Force override DaisyUI default theme colors */
