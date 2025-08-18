@@ -53,25 +53,6 @@ import "../styles/global.css"
     <meta property="twitter:image" content="/favicon.svg" />
     
     <meta name="generator" content={Astro.generator} />
-    <style>
-        /* Force override DaisyUI default theme colors */
-        :root,
-        html[data-theme="light"],
-        [data-theme="light"] {
-            --color-primary: oklch(72% 0.219 149.579) !important;
-            --color-primary-content: oklch(100% 0 0) !important;
-            --color-secondary: oklch(92% 0 0) !important;
-            --color-secondary-content: oklch(72% 0.219 149.579) !important;
-        }
-        
-        html[data-theme="dark"],
-        [data-theme="dark"] {
-            --color-primary: oklch(72% 0.219 149.579) !important;
-            --color-primary-content: oklch(96% 0.018 272.314) !important;
-            --color-secondary: oklch(96% 0.007 247.896) !important;
-            --color-secondary-content: oklch(72% 0.219 149.579) !important;
-        }
-    </style>
 </head>
 <body class="bg-base-200 min-h-screen">
     <div id="app" class="mx-auto bg-base-100 min-h-screen shadow-lg flex flex-col">

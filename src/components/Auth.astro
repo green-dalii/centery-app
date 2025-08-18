@@ -4,8 +4,8 @@ import { Icon } from 'astro-icon/components';
 
 <div class="p-6">
     <!-- LOGO Hero -->
-    <div class="flex justify-center my-14">
-        <Icon name="centery-logo" class="w-24 h-24" />
+    <div class="flex justify-center my-16">
+        <Icon name="centery-logo" class="w-28 h-28" />
     </div>
     <div class="mb-6">
         <div class="flex bg-base-200 rounded-lg p-1 mb-6">
@@ -46,7 +46,7 @@ import { Icon } from 'astro-icon/components';
 
     <!-- Powered by GreenerAI -->
     <div class="flex justify-center mt-8">
-        <p class="text-xs text-base-300">Powered by <span class="font-bold">GreenerAI</span></p>
+        <p class="text-xs text-base-content/50">Powered by <span class="font-bold">GreenerAI</span></p>
     </div>
 </div>
 
@@ -118,15 +118,15 @@ import { Icon } from 'astro-icon/components';
         const registerForm = document.getElementById('register-form');
 
         loginBtn?.addEventListener('click', () => {
-            if (loginBtn) loginBtn.className = 'flex-1 py-2 px-4 rounded-md bg-white shadow-sm font-medium text-primary-600';
-            if (registerBtn) registerBtn.className = 'flex-1 py-2 px-4 rounded-md font-medium text-gray-600';
+            if (loginBtn) loginBtn.className = 'flex-1 py-2 px-4 rounded-md bg-base-100 shadow-sm font-medium text-primary';
+            if (registerBtn) registerBtn.className = 'flex-1 py-2 px-4 rounded-md font-medium text-base-content/60';
             loginForm?.classList.remove('hidden');
             registerForm?.classList.add('hidden');
         });
 
         registerBtn?.addEventListener('click', () => {
-            if (registerBtn) registerBtn.className = 'flex-1 py-2 px-4 rounded-md bg-white shadow-sm font-medium text-primary-600';
-            if (loginBtn) loginBtn.className = 'flex-1 py-2 px-4 rounded-md font-medium text-gray-600';
+            if (registerBtn) registerBtn.className = 'flex-1 py-2 px-4 rounded-md bg-base-100 shadow-sm font-medium text-primary';
+            if (loginBtn) loginBtn.className = 'flex-1 py-2 px-4 rounded-md font-medium text-base-content/60';
             registerForm?.classList.remove('hidden');
             loginForm?.classList.add('hidden');
         });

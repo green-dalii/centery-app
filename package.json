@@ -18,13 +18,12 @@
     "@types/uuid": "^10.0.0",
     "astro": "^5.13.0",
     "astro-icon": "^1.1.5",
+    "tailwindcss": "^4.1.12",
     "typescript": "^5.9.2",
     "uuid": "^11.1.0"
   },
   "devDependencies": {
-    "@astrojs/tailwind": "^5.1.2",
     "daisyui": "^5.0.50",
-    "tailwindcss": "^3.4.17",
     "wrangler": "^4.30.0"
   }
 }
