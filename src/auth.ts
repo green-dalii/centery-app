@@ -43,8 +43,63 @@ async function handleRegister(request: Request, env: Env): Promise<Response> {
       });
     }
 
-    if (username.length < 3 || password.length < 6) {
-      return new Response(JSON.stringify({ error: '用户名至少3位，密码至少6位' }), {
+    // 用户名验证：至少3位字符，不能为纯数字
+    if (username.length < 3) {
+      return new Response(JSON.stringify({ error: '用户名长度至少为3位字符' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (/^\d+$/.test(username)) {
+      return new Response(JSON.stringify({ error: '用户名不能为纯数字' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    // 密码验证：至少6位，不能为常见弱密码
+    if (password.length < 6) {
+      return new Response(JSON.stringify({ error: '密码长度至少为6位' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    // 使用正则表达式检测弱密码模式
+    const weakPasswordPatterns = [
+      /^(\d)\1{5,}$/, // 6位或以上相同数字 (如: 111111, 000000)
+      /^(.)\1{5,}$/, // 6位或以上相同字符 (如: aaaaaa)
+      /^123456\d*$/, // 以123456开头
+      /^\d*654321$/, // 以654321结尾
+      /^(012|123|234|345|456|567|678|789|890){2,}$/, // 连续数字重复
+      /^(abc|bcd|cde|def|efg|fgh|ghi|hij|ijk|jkl|klm|lmn|mno|nop|opq|pqr|qrs|rst|stu|tuv|uvw|vwx|wxy|xyz){2,}$/i, // 连续字母重复
+      /^(qwe|wer|ert|rty|tyu|yui|uio|iop|asd|sdf|dfg|fgh|ghj|hjk|jkl|zxc|xcv|cvb|vbn|bnm){2,}$/i, // 键盘序列重复
+      /^(password|admin|user|guest|test|demo)\d*$/i, // 常见单词+数字
+      /^\d{6,}$/, // 纯数字6位以上
+      /^[a-z]{6,}$/i, // 纯字母6位以上
+      /^(19|20)\d{2}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])$/, // 日期格式 (YYYYMMDD)
+      /^\d{4}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])$/, // 日期格式 (YYMMDD)
+    ];
+
+    // 常见弱密码列表作为补充
+    const commonWeakPasswords = ['password', 'admin', 'user', 'guest', 'test', 'demo', 'root', 'login', 'welcome', 'qwerty', 'asdfgh', 'zxcvbn'];
+
+    const lowerPassword = password.toLowerCase();
+
+    // 检查正则表达式模式
+    for (const pattern of weakPasswordPatterns) {
+      if (pattern.test(lowerPassword)) {
+        return new Response(JSON.stringify({ error: '密码过于简单，请使用更复杂的密码' }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
+    // 检查常见弱密码列表
+    if (commonWeakPasswords.includes(lowerPassword)) {
+      return new Response(JSON.stringify({ error: '密码过于简单，请使用更复杂的密码' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
       });

@@ -1,5 +1,7 @@
 ---
+// Products.astro - 商品展示页面
 import { Icon } from 'astro-icon/components';
+import ModalToast from './ModalToast.astro';
 ---
 <div class="relative">
     <div class="sticky top-14 bg-base-100 z-20 p-4 border-b border-base-200">
@@ -31,8 +33,13 @@ import { Icon } from 'astro-icon/components';
 </div>
 
 <dialog id="add_to_cart_modal" class="modal">
-  <div class="modal-box">
-    <h3 id="modal-product-name" class="font-bold text-lg mb-4"></h3>
+  <div class="modal-box p-0">
+    <ModalToast />
+    <div class="w-full h-64 bg-base-200 overflow-hidden">
+      <img id="modal-product-image" src="" alt="" class="w-full h-full object-cover" style="display: none;">
+    </div>
+    <div class="p-6">
+      <h3 id="modal-product-name" class="font-bold text-lg mb-4"></h3>
     <div class="grid grid-cols-1 gap-4 text-sm">
       <div class="flex items-center">
         <span class="w-16">单价</span>
@@ -41,6 +48,7 @@ import { Icon } from 'astro-icon/components';
       <div class="flex items-center">
         <span class="w-16">库存</span>
         <p id="modal-product-stock" class="font-semibold"></p>
+        <p id="modal-product-stock-unit" class="ml-2"></p>
       </div>
       <div class="flex items-center">
         <span class="w-16">下单量</span>
@@ -51,17 +59,24 @@ import { Icon } from 'astro-icon/components';
         </div>
         <p id="modal-product-unit" class="ml-2"></p>
       </div>
+      <div class="flex flex-col">
+         <span class="w-16 mb-2">描述</span>
+         <p id="modal-product-description" class="text-sm text-base-content/70 leading-relaxed"></p>
+       </div>
+     </div>
+     <div class="modal-action mt-6">
+       <button id="modal-add-to-cart-btn" class="btn btn-primary">加入购物车</button>
+       <form method="dialog">
+         <button class="btn">取消</button>
+       </form>
+     </div>
     </div>
-    <div class="modal-action mt-6">
-      <button id="modal-add-to-cart-btn" class="btn btn-primary">加入购物车</button>
-      <form method="dialog">
-        <button class="btn">取消</button>
-      </form>
-    </div>
-  </div>
-</dialog>
+   </div>
+ </dialog>
 
 <script>
+    import { globalApiCall } from '../utils/api.ts';
+    
     let authToken = localStorage.getItem('authToken');
     let currentPageToken = '';
     let hasMore = false;
@@ -70,29 +85,8 @@ import { Icon } from 'astro-icon/components';
     let initialY = 0;
     let isRefreshing = false;
 
-    async function apiCall(endpoint: string, options: any = {}) {
-        const config = {
-            headers: {
-                'Content-Type': 'application/json',
-                ...(authToken && { 'Authorization': `Bearer ${authToken}` })
-            },
-            ...options
-        };
-
-        try {
-            const response = await fetch(`/api${endpoint}`, config);
-            const data = await response.json();
-            
-            if (!response.ok) {
-                throw new Error(data.error || 'API request failed');
-            }
-            
-            return data;
-        } catch (error: any) {
-            console.error('API Error:', error);
-            throw error;
-        }
-    }
+    // 使用全局API调用函数
+    const apiCall = globalApiCall;
 
     async function loadProducts(pageToken = '', searchTerm = '', forceRefresh = false) {
         const loadingIndicator = document.getElementById('loading-indicator');
@@ -121,14 +115,17 @@ import { Icon } from 'astro-icon/components';
         }
 
         try {
-            const data = await apiCall(`/products?pageSize=10&pageToken=${pageToken}&q=${encodeURIComponent(searchTerm)}`);
+            const data = await globalApiCall(`/products?pageSize=10&pageToken=${pageToken}&q=${encodeURIComponent(searchTerm)}`);
             sessionStorage.setItem(cacheKey, JSON.stringify(data));
             renderProducts(data.products);
             hasMore = data.hasMore;
             currentPageToken = data.nextPageToken;
             updatePagination();
         } catch (error: any) {
-            (window as any).showToast('加载商品失败', 'error');
+            // globalApiCall已经处理了401错误和Toast显示
+            if (!error.message.includes('未授权')) {
+                (window as any).showToast('加载商品失败', 'error');
+            }
             if (productsList) {
                 productsList.innerHTML = '<p class="text-center text-gray-500">加载失败，请稍后重试。</p>';
             }
@@ -213,6 +210,8 @@ import { Icon } from 'astro-icon/components';
         selected?: boolean;
     }
 
+
+
     function addToCart(product: Product, quantity: number = 1) {
         let cart = JSON.parse(localStorage.getItem('cart') || '[]') as Product[];
         const existingProduct = cart.find(item => item.id === product.id);
@@ -231,6 +230,7 @@ import { Icon } from 'astro-icon/components';
         const quantityInput = document.getElementById('modal-quantity-input') as HTMLInputElement;
         const quantityMinus = document.getElementById('quantity-minus');
         const quantityPlus = document.getElementById('quantity-plus');
+        
 
         quantityMinus?.addEventListener('click', () => {
             let currentValue = parseInt(quantityInput.value, 10);
@@ -242,8 +242,19 @@ import { Icon } from 'astro-icon/components';
         quantityPlus?.addEventListener('click', () => {
             const max = parseInt(quantityInput.max, 10);
             let currentValue = parseInt(quantityInput.value, 10);
+            
+            // 获取当前商品数据
+            const modalAddToCartBtn = document.getElementById('modal-add-to-cart-btn');
+            const productData = modalAddToCartBtn ? JSON.parse(modalAddToCartBtn.getAttribute('data-product') || '{}') : {};
+            
             if (currentValue < max) {
                 quantityInput.value = (currentValue + 1).toString();
+            } else if (quantityInput.disabled === true && productData.stock > 0) {
+                // 当input被禁用且库存不为零时，显示购物车该商品数量已达库存上限的提示
+                (window as any).showModalToast(`购物车该商品数量已达库存上限`, 'error');
+            } else {
+                // 显示Toast提示，数量不能超过最大库存
+                (window as any).showModalToast(`下单数量不能超过最大库存 ${max} 件`, 'error');
             }
         });
 
@@ -253,6 +264,8 @@ import { Icon } from 'astro-icon/components';
             let currentValue = parseInt(quantityInput.value, 10);
             if (currentValue > max) {
                 quantityInput.value = max.toString();
+                // 显示Toast提示，数量不能超过最大库存
+                (window as any).showModalToast(`下单数量不能超过最大库存 ${max} 件`, 'error');
             }
             if (currentValue < 1) {
                 quantityInput.value = "1";
@@ -271,8 +284,20 @@ import { Icon } from 'astro-icon/components';
                 const existingProduct = cart.find(item => item.id === productData.id);
                 const quantityInCart = existingProduct ? (existingProduct.quantity || 0) : 0;
 
+                // 检查库存情况
+                if (productData.stock === 0) {
+                    (window as any).showModalToast('商品已售罄', 'error');
+                    return;
+                }
+
+                if (quantityInCart >= productData.stock) {
+                    (window as any).showModalToast('购物车数量已达库存上限', 'error');
+                    return;
+                }
+
                 if (quantityToAdd + quantityInCart > productData.stock) {
-                    (window as any).showToast(`库存不足，您最多还能添加 ${productData.stock - quantityInCart} 件`, 'error');
+                    const remainingStock = productData.stock - quantityInCart;
+                    (window as any).showModalToast(`库存不足，您最多还能添加 ${remainingStock} 件`, 'error');
                     return;
                 }
 
@@ -313,19 +338,43 @@ import { Icon } from 'astro-icon/components';
                 const modalProductPrice = document.getElementById('modal-product-price');
                 const modalProductUnit = document.getElementById('modal-product-unit');
                 const modalProductStock = document.getElementById('modal-product-stock');
+                const modalProductStockUnit = document.getElementById('modal-product-stock-unit');
+                const modalProductImage = document.getElementById('modal-product-image') as HTMLImageElement;
+                const modalProductDescription = document.getElementById('modal-product-description');
                 const modalQuantityInput = document.getElementById('modal-quantity-input') as HTMLInputElement;
                 const modalAddToCartBtn = document.getElementById('modal-add-to-cart-btn') as HTMLButtonElement;
 
                 if (modalProductName) modalProductName.textContent = productData.name;
                 if (modalProductPrice) modalProductPrice.textContent = `¥${productData.price}`;
-                if (modalProductUnit) modalProductUnit.textContent = productData.unit;
                 if (modalProductStock) modalProductStock.textContent = productData.stock;
+                if (modalProductStockUnit) modalProductStockUnit.textContent = productData.unit;
+                if (modalProductDescription) modalProductDescription.textContent = productData.description || '暂无描述';
+                
+                if (modalProductImage) {
+                    if (productData.image) {
+                        modalProductImage.src = productData.image;
+                        modalProductImage.alt = productData.name;
+                        modalProductImage.style.display = 'block';
+                    } else {
+                        modalProductImage.style.display = 'none';
+                    }
+                }
                 
                 if (modalQuantityInput && modalAddToCartBtn) {
+                    // 检查购物车数量是否已达库存上限
                     let cart = JSON.parse(localStorage.getItem('cart') || '[]') as Product[];
                     const existingProduct = cart.find(item => item.id === productData.id);
                     const quantityInCart = existingProduct ? (existingProduct.quantity || 0) : 0;
                     const maxQuantity = productData.stock - quantityInCart;
+                    
+                    // 根据库存情况设置单位文字
+                    if (modalProductUnit) {
+                        if (maxQuantity <= 0 && productData.stock > 0) {
+                            modalProductUnit.textContent = '购物车该类已满';
+                        } else {
+                            modalProductUnit.textContent = productData.unit;
+                        }
+                    }
 
                     modalQuantityInput.value = '1';
                     modalQuantityInput.max = maxQuantity.toString();

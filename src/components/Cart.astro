@@ -29,7 +29,7 @@ import { Icon } from 'astro-icon/components';
 
 <!-- Order Confirmation Modal -->
 <dialog id="order-confirmation-modal" class="modal">
-  <div class="modal-box">
+  <div class="modal-box h-[60vh] overflow-y-auto">
     <h3 class="font-bold text-lg">确认订单</h3>
     <p class="py-4">请再次确认订单项目和收货地址</p>
     <div id="address-selection-container">
@@ -37,7 +37,19 @@ import { Icon } from 'astro-icon/components';
         <div class="label">
           <span class="label-text">收货地址</span>
         </div>
-        <select id="address-select" class="select select-bordered"></select>
+        <div class="dropdown dropdown-bottom w-full">
+          <div id="address-dropdown-btn" tabindex="0" role="button" class="btn btn-outline w-full justify-between">
+            <span id="selected-address-text" class="text-left truncate flex-1">请选择收货地址</span>
+            <svg class="w-4 h-4 ml-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+            </svg>
+          </div>
+          <ul id="address-dropdown-menu" tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-[9999] w-full p-2 shadow-lg border border-base-300 max-h-60 overflow-y-auto">
+            <!-- 地址选项将通过JavaScript动态添加 -->
+          </ul>
+        </div>
+        <!-- 隐藏的select用于保持原有逻辑兼容性 -->
+        <select id="address-select" class="hidden"></select>
       </label>
     </div>
     <div id="no-address-message" class="hidden">
@@ -51,7 +63,9 @@ import { Icon } from 'astro-icon/components';
 </dialog>
 
 <script>
-  interface CartItem {
+    import { globalApiCall } from '../utils/api.ts';
+
+    interface CartItem {
     id: string;
     name: string;
     image: string;
@@ -219,7 +233,7 @@ import { Icon } from 'astro-icon/components';
     checkoutButton?.addEventListener('click', async () => {
       const itemsToCheckout = cart.filter(item => item.selected);
       if (itemsToCheckout.length === 0) {
-        (window as any).showToast('请选择要下单的商品', 'error');
+        (window as any).showToast('请在商城中选择商品并加入购物车', 'error');
         return;
       }
       await openOrderConfirmationModal();
@@ -234,23 +248,8 @@ import { Icon } from 'astro-icon/components';
           return;
         }
 
-        const response = await fetch('/api/user/addresses', {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-
-        if (response.status === 401) {
-            (window as any).showToast('请先登录', 'error');
-            localStorage.removeItem('authToken');
-            window.location.href = '/';
-            return;
-        }
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch addresses');
-        }
-        const data = await response.json();
+        // 使用全局API调用函数
+        const data = await globalApiCall('/user/addresses');
         const addresses = data.addresses;
 
         if (addresses.length === 0) {
@@ -262,16 +261,77 @@ import { Icon } from 'astro-icon/components';
           noAddressMessage?.classList.add('hidden');
           confirmOrderBtn?.classList.remove('btn-disabled');
 
+          // 清空并重新填充dropdown菜单和隐藏的select
+          const dropdownMenu = document.getElementById('address-dropdown-menu');
+          const selectedAddressText = document.getElementById('selected-address-text');
+          
           addressSelect.innerHTML = '';
+          if (dropdownMenu) dropdownMenu.innerHTML = '';
+          
+          let defaultAddress: any = null;
+          
           addresses.forEach((addr: any) => {
+            // 为隐藏的select添加option（保持兼容性）
             const option = document.createElement('option');
             option.value = addr.id;
             option.textContent = `${addr.recipient_name}, ${addr.phone}, ${addr.address}`;
             if (addr.is_default) {
               option.selected = true;
+              defaultAddress = addr;
             }
             addressSelect.appendChild(option);
+            
+            // 为dropdown菜单添加选项
+            if (dropdownMenu) {
+              const li = document.createElement('li');
+              li.innerHTML = `
+                <a class="address-option flex flex-col items-start p-3 hover:bg-base-200 rounded-lg" data-address-id="${addr.id}">
+                  <div class="flex items-center w-full">
+                    <div class="flex-1">
+                      <div class="font-medium text-base-content">${addr.recipient_name}</div>
+                      <div class="text-sm text-base-content/70">${addr.phone}</div>
+                      <div class="text-sm text-base-content/60 mt-1 leading-relaxed">${addr.address}</div>
+                    </div>
+                    ${addr.is_default ? '<div class="badge badge-primary badge-sm ml-2">默认</div>' : ''}
+                  </div>
+                </a>
+              `;
+              dropdownMenu.appendChild(li);
+            }
           });
+          
+          // 设置默认选中的地址显示
+           if (defaultAddress && selectedAddressText) {
+             selectedAddressText.textContent = `${defaultAddress.recipient_name}, ${defaultAddress.phone}`;
+           } else if (addresses.length > 0 && selectedAddressText) {
+             selectedAddressText.textContent = `${addresses[0].recipient_name}, ${addresses[0].phone}`;
+           }
+           
+           // 添加地址选项点击事件
+           const addressOptions = dropdownMenu?.querySelectorAll('.address-option');
+           addressOptions?.forEach(option => {
+             option.addEventListener('click', (e) => {
+               e.preventDefault();
+               const addressId = option.getAttribute('data-address-id');
+               const selectedAddr = addresses.find((addr: any) => addr.id.toString() === addressId);
+               
+               if (selectedAddr && selectedAddressText) {
+                 // 更新显示文本
+                 selectedAddressText.textContent = `${selectedAddr.recipient_name}, ${selectedAddr.phone}`;
+                 
+                 // 更新隐藏的select值（保持兼容性）
+                 addressSelect.value = addressId || '';
+                 
+                 // 关闭dropdown
+                 const dropdownBtn = document.getElementById('address-dropdown-btn');
+                 const dropdownMenu = document.getElementById('address-dropdown-menu');
+                 dropdownBtn?.blur();
+                 dropdownMenu?.blur();
+                 // 移除active状态
+                 (document.activeElement as HTMLElement)?.blur();
+               }
+             });
+           });
         }
         orderConfirmationModal?.showModal();
       } catch (error) {
@@ -295,7 +355,7 @@ import { Icon } from 'astro-icon/components';
 
       const itemsToCheckout = cart.filter(item => item.selected);
       if (itemsToCheckout.length === 0) {
-        (window as any).showToast('请选择要下单的商品', 'error');
+        (window as any).showToast('请在商城中选择商品并加入购物车', 'error');
         return;
       }
 
@@ -314,22 +374,16 @@ import { Icon } from 'astro-icon/components';
       }
 
       try {
-        const token = localStorage.getItem('authToken');
-        const response = await fetch('/api/orders', {
+        // 使用全局API调用函数
+        const data = await globalApiCall('/orders', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
           body: JSON.stringify({
             items: itemsToCheckout.map(item => ({ id: item.id, quantity: item.quantity })),
             addressId: selectedAddressId
           })
         });
 
-        const data = await response.json();
-
-        if (response.ok && data.success) {
+        if (data.success) {
           (window as any).showToast('订单创建成功！', 'success');
           // Clear selected items from cart
           cart = cart.filter(item => !item.selected);
@@ -338,9 +392,8 @@ import { Icon } from 'astro-icon/components';
           closeOrderConfirmationModal();
           // Dispatch an event to notify product list to refresh
           document.dispatchEvent(new CustomEvent('orderplaced'));
-        } else {
-          throw new Error(data.error || '创建订单失败');
         }
+        // globalApiCall已经处理了错误情况
       } catch (error: any) {
         console.error('Error creating order:', error);
         const errorMessage = error.message || '创建订单失败，请稍后再试';

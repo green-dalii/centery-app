@@ -86,7 +86,7 @@ import { Icon } from 'astro-icon/components';
             </div>
             <div class="modal-action">
                 <button type="button" class="btn btn-ghost" id="cancel-address-modal-btn">取消</button>
-                <button type="submit" class="btn btn-primary">保存</button>
+                <button type="submit" class="btn btn-primary" id="save-address-btn">保存</button>
             </div>
         </form>
     </div>
@@ -100,33 +100,14 @@ import { Icon } from 'astro-icon/components';
 </style>
 
 <script>
+    import { globalApiCall } from '../utils/api.ts';
+    
     let currentUser: any = null;
     let allOrders: any[] = [];
     let currentFilter = '';
 
-    async function apiCall(endpoint: string, options: any = {}) {
-        const authToken = localStorage.getItem('authToken');
-        const config = {
-            headers: {
-                'Content-Type': 'application/json',
-                ...(authToken && { 'Authorization': `Bearer ${authToken}` })
-            },
-            ...options
-        };
-
-        try {
-            const response = await fetch(`/api${endpoint}`, config);
-            if (!response.ok) {
-                const data = await response.json().catch(() => ({}));
-                throw new Error(data.error || `API request failed with status ${response.status}`);
-            }
-            return await response.json();
-        } catch (error: any) {
-            console.error('API Error:', error);
-            (window as any).showToast(error.message, 'error');
-            throw error;
-        }
-    }
+    // 使用全局API调用函数
+    const apiCall = globalApiCall;
 
     function updateUI() {
         const userName = document.getElementById('user-name');
@@ -188,9 +169,14 @@ import { Icon } from 'astro-icon/components';
         cancelled: '已取消'
     };
 
-    function renderOrders() {
+    function renderOrders(isLoading = false) {
         const ordersList = document.getElementById('orders-list');
         if (!ordersList) return;
+
+        if (isLoading) {
+            ordersList.innerHTML = '<div class="text-center text-gray-500 py-8"><span class="loading loading-spinner loading-md"></span> 载入中...</div>';
+            return;
+        }
 
         if (!currentFilter) {
             ordersList.innerHTML = '<div class="text-center text-gray-500 py-8">请选择一个分类以查看订单</div>';
@@ -239,13 +225,13 @@ import { Icon } from 'astro-icon/components';
                     <div class="flex justify-between items-start mb-2">
                         <span class="text-xs text-gray-600">订单号: ${order.id}</span>
                         <span class="text-xs text-nowrap font-medium px-2 py-1 rounded-full ${
-                            order.status === 'pending' ? 'bg-blue-100 text-blue-800' :
-                            order.status === 'processing' ? 'bg-yellow-100 text-yellow-800' :
-                            order.status === 'shipped' ? 'bg-orange-100 text-orange-800' :
-                            order.status === 'received' ? 'bg-purple-100 text-purple-800' :
-                            order.status === 'completed' ? 'bg-green-100 text-green-800' :
-                            order.status === 'cancelled' ? 'bg-red-100 text-red-800' :
-                            'bg-gray-100 text-gray-800'
+                            order.status === 'pending' ? 'bg-red-100 text-red-800' :
+                            order.status === 'processing' ? 'bg-orange-100 text-orange-800' :
+                            order.status === 'shipped' ? 'bg-yellow-100 text-yellow-800' :
+                            order.status === 'received' ? 'bg-green-100 text-green-800' :
+                            order.status === 'completed' ? 'bg-sky-100 text-sky-800' :
+                            order.status === 'cancelled' ? 'bg-neutral-100 text-neutral-800' :
+                            'bg-primary text-primary-content'
                         }">${orderStatusMap[order.status] || order.status}</span>
                     </div>
                     ${itemsHtml ? `<div class="mb-2 space-y-1">${itemsHtml}</div>` : ''}
@@ -270,7 +256,10 @@ import { Icon } from 'astro-icon/components';
             allOrders = data.orders || [];
             renderOrders(); // Initial render will now show the placeholder
         } catch (error: any) {
-            (window as any).showToast('加载订单失败', 'error');
+            // globalApiCall已经处理了401错误和Toast显示
+            if (!error.message.includes('未授权')) {
+                (window as any).showToast('加载订单失败', 'error');
+            }
         }
     }
 
@@ -333,7 +322,7 @@ import { Icon } from 'astro-icon/components';
             const data = await apiCall('/user/addresses');
             renderAddresses(data.addresses || []);
         } catch (error) {
-            // API call already shows toast
+            // globalApiCall已经处理了401错误和Toast显示
         }
     }
 
@@ -365,6 +354,14 @@ import { Icon } from 'astro-icon/components';
         e.preventDefault();
         const form = e.target as HTMLFormElement;
         const id = (form.querySelector('#address-id') as HTMLInputElement).value;
+        const saveBtn = document.getElementById('save-address-btn') as HTMLButtonElement;
+        
+        // 保存原始按钮内容并设置loading状态
+        const originalButtonContent = saveBtn?.innerHTML;
+        if (saveBtn) {
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = `<span class="loading loading-spinner loading-sm"></span> 保存中...`;
+        }
 
         const data = {
             recipient_name: (form.querySelector('#recipient-name') as HTMLInputElement).value,
@@ -383,6 +380,12 @@ import { Icon } from 'astro-icon/components';
             loadAddresses();
         } catch (error) {
             // API call already shows toast
+        } finally {
+            // 恢复按钮状态
+            if (saveBtn && originalButtonContent) {
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = originalButtonContent;
+            }
         }
     }
 
@@ -410,7 +413,7 @@ import { Icon } from 'astro-icon/components';
 
         // Order filter listeners
         const filterContainer = document.getElementById('order-filters');
-        filterContainer?.addEventListener('click', (e) => {
+        filterContainer?.addEventListener('click', async (e) => {
             const target = e.target as HTMLElement;
             if (target.classList.contains('filter-btn')) {
                 // Remove active state from all buttons
@@ -425,7 +428,14 @@ import { Icon } from 'astro-icon/components';
                 target.className = 'filter-btn btn btn-soft btn-primary active';
                 
                 currentFilter = target.dataset.status || 'all';
-                renderOrders();
+                
+                // 显示loading状态
+                renderOrders(true);
+                
+                // 模拟数据加载延迟，然后显示实际数据
+                setTimeout(() => {
+                    renderOrders();
+                }, 300);
             }
         });
 

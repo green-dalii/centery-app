@@ -1,11 +1,16 @@
-<div id="toast-container" class="toast toast-center toast-middle z-[9999]">
-    <!-- Toasts will be dynamically added here -->
+---
+// ModalToast.astro - Modal内部的Toast通知组件
+---
+
+<!-- Modal内部的Toast容器 -->
+<div id="modal-toast-container" class="toast toast-middle toast-center z-50">
+    <!-- Modal toasts will be dynamically added here -->
 </div>
 
 <script>
-// Utility functions
-function showToast(message: string, type: string = 'info') {
-    const toastContainer = document.getElementById('toast-container');
+// Modal内部的Toast函数
+function showModalToast(message: string, type: string = 'info') {
+    const toastContainer = document.getElementById('modal-toast-container');
     if (!toastContainer) return;
 
     const toast = document.createElement('div');
@@ -35,8 +40,8 @@ function showToast(message: string, type: string = 'info') {
     }, 3000);
 }
 
-// Make it globally available
+// 使函数全局可用
 if (typeof window !== 'undefined') {
-    (window as any).showToast = showToast;
+    (window as any).showModalToast = showModalToast;
 }
 </script>

@@ -24,7 +24,9 @@ import Cart from '../components/Cart.astro';
 </Layout>
 
 <script>
-    import '../styles/global.css';
+    // 引入全局API工具
+    import '../utils/api.ts';
+    
     // App state
     let authToken: string | null = localStorage.getItem('authToken');
 
@@ -60,6 +62,12 @@ import Cart from '../components/Cart.astro';
             authToken = localStorage.getItem('authToken');
             switchTab('products');
             document.dispatchEvent(new CustomEvent('loadproducts'));
+        });
+        
+        // Handle force logout (401 errors)
+        document.addEventListener('forcelogout', () => {
+            authToken = null;
+            switchTab('auth');
         });
 
         // Initialize app

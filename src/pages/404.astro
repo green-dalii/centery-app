@@ -1,0 +1,98 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="页面未找到 - Centery App">
+  <div class="flex flex-col items-center justify-center min-h-[60vh] px-4">
+    <div class="text-center">
+      <!-- 404 图标 -->
+      <div class="mb-8">
+        <svg class="w-32 h-32 mx-auto text-base-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M9.172 16.172a4 4 0 015.656 0M9 12h6m-6-4h6m2 5.291A7.962 7.962 0 0112 15c-2.34 0-4.47-.881-6.08-2.33l-.147-.15C4.399 11.247 4 10.049 4 8.781V6a2 2 0 012-2h12a2 2 0 012 2v2.781c0 1.268-.399 2.466-1.773 3.739l-.147.15A7.962 7.962 0 0112 15z"></path>
+        </svg>
+      </div>
+      
+      <!-- 404 标题 -->
+      <h1 class="text-6xl font-bold text-primary mb-4">404</h1>
+      
+      <!-- 错误信息 -->
+      <h2 class="text-2xl font-semibold text-base-content mb-4">页面未找到</h2>
+      <p class="text-base-content/70 mb-8 max-w-md mx-auto">
+        抱歉，您访问的页面不存在或已被移动。我们将在 <span id="countdown" class="font-semibold text-primary">3</span> 秒后自动跳转到首页。
+      </p>
+      
+      <!-- 操作按钮 -->
+      <div class="flex flex-col sm:flex-row gap-4 justify-center">
+        <a href="/" class="btn btn-primary">
+          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
+          </svg>
+          返回首页
+        </a>
+        <button onclick="history.back()" class="btn btn-outline">
+          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+          </svg>
+          返回上页
+        </button>
+      </div>
+    </div>
+  </div>
+</Layout>
+
+<script>
+  // 自动跳转倒计时
+  let countdown = 3;
+  const countdownElement = document.getElementById('countdown');
+  
+  const timer = setInterval(() => {
+    countdown--;
+    if (countdownElement) {
+      countdownElement.textContent = countdown.toString();
+    }
+    
+    if (countdown <= 0) {
+      clearInterval(timer);
+      window.location.href = '/';
+    }
+  }, 1000);
+  
+  // 页面可见性变化时暂停/恢复倒计时
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      clearInterval(timer);
+    }
+  });
+</script>
+
+<style>
+  /* 添加一些动画效果 */
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  .flex.flex-col.items-center {
+    animation: fadeIn 0.6s ease-out;
+  }
+  
+  /* 倒计时数字的脉冲效果 */
+  #countdown {
+    animation: pulse 1s infinite;
+  }
+  
+  @keyframes pulse {
+    0%, 100% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.1);
+    }
+  }
+</style>
