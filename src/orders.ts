@@ -66,17 +66,54 @@ async function createOrder(request: Request, user: { userId: number; username: s
       });
     }
 
-    // TODO: 验证商品库存（从飞书获取）
+    // 验证商品库存并获取最新单价
+    const validatedItems = [];
+    for (const item of items) {
+      try {
+        // 从飞书获取商品详情
+        const productData = await callFeishuBitableApi(env, 'GET', `/tables/${env.FEISHU_STOCK_TABLE_ID}/records/${item.id}`);
+        const productFields = productData.record.fields;
+        
+        const currentStock = productFields['库存剩余'] || 0;
+        const currentPrice = productFields['商品单价'] || 0;
+        const productName = productFields['商品名称'] && productFields['商品名称'][0] ? productFields['商品名称'][0].text : 'Unknown Product';
+        
+        // 检查库存是否足够
+        if (item.quantity > currentStock) {
+          return new Response(JSON.stringify({ 
+            error: `商品「${productName}」库存不足，当前库存：${currentStock}，请求数量：${item.quantity}` 
+          }), {
+            status: 400,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+        
+        validatedItems.push({
+          ...item,
+          currentPrice,
+          productName
+        });
+      } catch (error: any) {
+        if (error.message.includes('code: 254404')) {
+          return new Response(JSON.stringify({ error: `商品不存在：${item.id}` }), {
+            status: 404,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+        throw error; // 重新抛出其他错误
+      }
+    }
 
     const orderId = uuidv4(); // 生成唯一订单号
 
-    const records = items.map((item: any) => ({
+    const records = validatedItems.map((item: any) => ({
       fields: {
         '订单号': orderId,
         '商品名称': [item.id],
         '订单状态': '已下单',
         '用户名称': user.username,
         '订购数量': item.quantity,
+        '下单单价': parseFloat(item.currentPrice),
         '收货人': address.recipient_name,
         '联系方式': address.phone,
         '收货地址': address.address,

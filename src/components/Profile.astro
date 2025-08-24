@@ -14,7 +14,7 @@ import { Icon } from 'astro-icon/components';
                 </div>
                 <div>
                     <h3 class="font-semibold text-base-content" id="user-name">用户名</h3>
-                    <p class="text-sm text-base-content/60">欢迎使用Centery</p>
+                    <p class="text-sm text-base-content/60">欢迎使用智慧鑫诚</p>
                 </div>
             </div>
             <button id="logout-btn" class="btn btn-error">退出登录</button>
@@ -126,7 +126,7 @@ import { Icon } from 'astro-icon/components';
         }
     }
 
-    async function loadProfile() {
+    async function loadProfile(forceRefresh = false) {
         const authToken = localStorage.getItem('authToken');
         if (!authToken) {
             currentUser = null;
@@ -137,7 +137,7 @@ import { Icon } from 'astro-icon/components';
             const data = await apiCall('/user/profile');
             currentUser = data.user;
             updateUI();
-            loadOrders();
+            loadOrders(forceRefresh);
             loadAddresses();
             
             // Initialize button states
@@ -199,14 +199,27 @@ import { Icon } from 'astro-icon/components';
                 let productName = `商品ID: ${item.productId}`;
                 
                 try {
-                    // 尝试从不同的缓存键获取商品数据
-                    const cachedData = sessionStorage.getItem('products__');
-                    if (cachedData) {
-                        const data = JSON.parse(cachedData);
-                        const product = data.products?.find((p: any) => p.id === item.productId);
-                        if (product && product.name) {
-                            productName = product.name;
+                    // 尝试从所有可能的缓存键获取商品数据
+                    let foundProduct = null;
+                    
+                    // 遍历所有sessionStorage键，查找商品缓存
+                    for (let i = 0; i < sessionStorage.length; i++) {
+                        const key = sessionStorage.key(i);
+                        if (key && key.startsWith('products_')) {
+                            const cachedData = sessionStorage.getItem(key);
+                            if (cachedData) {
+                                const data = JSON.parse(cachedData);
+                                const product = data.products?.find((p: any) => p.id === item.productId);
+                                if (product && product.name) {
+                                    foundProduct = product;
+                                    break;
+                                }
+                            }
                         }
+                    }
+                    
+                    if (foundProduct) {
+                        productName = foundProduct.name;
                     }
                 } catch (e) {
                     console.warn('获取商品信息失败:', e);
@@ -250,10 +263,28 @@ import { Icon } from 'astro-icon/components';
         }).join('');
     }
 
-    async function loadOrders() {
+    async function loadOrders(forceRefresh = false) {
+        const cacheKey = 'user_orders';
+        
+        // 如果不强制刷新，先尝试从缓存读取
+        if (!forceRefresh) {
+            const cachedData = sessionStorage.getItem(cacheKey);
+            if (cachedData) {
+                try {
+                    allOrders = JSON.parse(cachedData);
+                    renderOrders();
+                    return;
+                } catch (e) {
+                    console.warn('解析缓存订单数据失败:', e);
+                }
+            }
+        }
+        
         try {
             const data = await apiCall('/orders');
             allOrders = data.orders || [];
+            // 将订单数据存储到SessionStorage
+            sessionStorage.setItem(cacheKey, JSON.stringify(allOrders));
             renderOrders(); // Initial render will now show the placeholder
         } catch (error: any) {
             // globalApiCall已经处理了401错误和Toast显示
@@ -435,7 +466,7 @@ import { Icon } from 'astro-icon/components';
                 // 模拟数据加载延迟，然后显示实际数据
                 setTimeout(() => {
                     renderOrders();
-                }, 300);
+                }, 100);
             }
         });
 
@@ -449,7 +480,7 @@ import { Icon } from 'astro-icon/components';
 
     document.addEventListener('tabswitched', (event: any) => {
         if (event.detail.tab === 'profile') {
-            loadProfile();
+            loadProfile(true);
         }
     });
 

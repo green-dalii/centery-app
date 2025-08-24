@@ -16,6 +16,10 @@ export async function handleProducts(request: Request, env: Env, path: string): 
     return await getProducts(request, env);
   }
 
+  if (path === '/api/products/categories' && method === 'GET') {
+    return await getProductCategories(env);
+  }
+
   if (path.match(/^\/api\/products\/\w+$/) && method === 'GET') {
     const productId = path.split('/').pop()!;
     return await getProductById(productId, env);
@@ -31,10 +35,11 @@ async function getProducts(request: Request, env: Env): Promise<Response> {
   try {
     const url = new URL(request.url);
     const pageToken = url.searchParams.get('pageToken') || '';
-    const pageSize = parseInt(url.searchParams.get('pageSize') || '10', 10);
+    const pageSize = parseInt(url.searchParams.get('pageSize') || '12', 10);
     const searchTerm = url.searchParams.get('q') || '';
+    const category = url.searchParams.get('category') || '';
 
-    const { products, hasMore, nextPageToken } = await fetchProductsFromFeishu(env, pageToken, pageSize, searchTerm);
+    const { products, hasMore, nextPageToken } = await fetchProductsFromFeishu(env, pageToken, pageSize, searchTerm, category);
     return new Response(JSON.stringify({
       success: true,
       products: products,
@@ -47,6 +52,48 @@ async function getProducts(request: Request, env: Env): Promise<Response> {
   } catch (error) {
     console.error('Get products error:', error);
     return new Response(JSON.stringify({ error: '获取商品列表失败' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+}
+
+/**
+ * 获取商品分类列表
+ */
+async function getProductCategories(env: Env): Promise<Response> {
+  try {
+    const data = await callFeishuBitableApi(env, 'GET', `/tables/${env.FEISHU_STOCK_TABLE_ID}/fields`);
+    
+    // 查找"类型"字段
+    const typeField = data.items?.find((field: any) => field.field_name === '类型');
+    
+    if (!typeField || !typeField.property?.options) {
+      return new Response(JSON.stringify({
+        success: true,
+        categories: []
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+    
+    const categories = typeField.property.options.map((option: any) => ({
+      id: option.id,
+      name: option.name,
+      color: option.color
+    }));
+    
+    return new Response(JSON.stringify({
+      success: true,
+      categories: categories
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  } catch (error) {
+    console.error('Get product categories error:', error);
+    return new Response(JSON.stringify({ error: '获取商品分类失败' }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
     });
@@ -100,32 +147,53 @@ async function getProductById(productId: string, env: Env): Promise<Response> {
 /**
  * 从飞书多维表格获取商品数据
  */
-async function fetchProductsFromFeishu(env: Env, pageToken?: string, pageSize?: number, searchTerm?: string): Promise<{ products: any[], hasMore: boolean, nextPageToken: string }> {
+async function fetchProductsFromFeishu(env: Env, pageToken?: string, pageSize?: number, searchTerm?: string, category?: string): Promise<{ products: any[], hasMore: boolean, nextPageToken: string }> {
+  // 构建查询参数
+  const queryParams = new URLSearchParams();
+  if (pageSize) {
+    queryParams.append('page_size', pageSize.toString());
+  }
+  if (pageToken) {
+    queryParams.append('page_token', pageToken);
+  }
+
+  // 构建请求体
   const body: {
-    page_size?: number;
-    page_token?: string;
     filter?: any;
     field_names?: string[];
   } = {
-    page_size: pageSize,
-    page_token: pageToken,
     field_names: ["商品名称", "类型", "商品图片", "商品单价", "库存剩余", "单位", "商品描述"]
   };
 
+  // 构建筛选条件
+  const conditions: any[] = [];
+  
   if (searchTerm) {
+    conditions.push({
+      field_name: "商品名称",
+      operator: "contains",
+      value: [searchTerm]
+    });
+  }
+  
+  if (category) {
+    conditions.push({
+      field_name: "类型",
+      operator: "is",
+      value: [category]
+    });
+  }
+  
+  if (conditions.length > 0) {
     body.filter = {
       conjunction: "and",
-      conditions: [
-        {
-          field_name: "商品名称",
-          operator: "contains",
-          value: [searchTerm]
-        }
-      ]
-    }
+      conditions: conditions
+    };
   }
 
-  const data = await callFeishuBitableApi(env, 'POST', `/tables/${env.FEISHU_STOCK_TABLE_ID}/records/search`, body);
+  // 构建完整的API路径
+  const apiPath = `/tables/${env.FEISHU_STOCK_TABLE_ID}/records/search?${queryParams.toString()}`;
+  const data = await callFeishuBitableApi(env, 'POST', apiPath, body);
 
   // 将飞书返回的原始数据格式化为我们需要的商品数据格式
   const products = data.items.map((item: any) => {
