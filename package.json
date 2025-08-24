@@ -1,7 +1,7 @@
 {
   "name": "centery-app",
   "type": "module",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "scripts": {
     "dev:astro": "astro dev",
     "dev": "astro build && wrangler dev src/index.ts --local",

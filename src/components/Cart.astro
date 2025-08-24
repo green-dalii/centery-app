@@ -43,7 +43,7 @@ import { Icon } from 'astro-icon/components';
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
             </svg>
           </div>
-          <ul id="address-dropdown-menu" tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-[9999] w-full p-2 shadow-lg border border-base-300 max-h-60 overflow-y-auto">
+          <ul id="address-dropdown-menu" tabindex="0" class="dropdown-content bg-base-100 rounded-box z-[9999] w-full p-2 shadow-lg border border-base-300 max-h-60 overflow-y-auto flex flex-col">
             <!-- 地址选项将通过JavaScript动态添加 -->
           </ul>
         </div>
@@ -283,8 +283,9 @@ import { Icon } from 'astro-icon/components';
             // 为dropdown菜单添加选项
             if (dropdownMenu) {
               const li = document.createElement('li');
+              li.className = 'w-full';
               li.innerHTML = `
-                <a class="address-option flex flex-col items-start p-3 hover:bg-base-200 rounded-lg" data-address-id="${addr.id}">
+                <a class="address-option flex flex-col items-start p-3 hover:bg-base-200 rounded-lg w-full" data-address-id="${addr.id}">
                   <div class="flex items-center w-full">
                     <div class="flex-1">
                       <div class="font-medium text-base-content">${addr.recipient_name}</div>
