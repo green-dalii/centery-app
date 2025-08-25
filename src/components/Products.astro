@@ -31,7 +31,7 @@ import ModalToast from './ModalToast.astro';
     <div class="p-4 pt-2">
         <div id="loading-indicator" class="text-center py-10"><span class="loading loading-spinner loading-md"></span>载入中...</div>
         <div id="products-container" class="hidden">
-            <div id="products-list" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+            <div id="products-list" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                 <!-- Product items will be injected here -->
             </div>
         </div>
@@ -229,7 +229,7 @@ import ModalToast from './ModalToast.astro';
         }
 
         try {
-            const data = await globalApiCall(`/products?pageSize=12&pageToken=${pageToken}&q=${encodeURIComponent(searchTerm)}&category=${encodeURIComponent(category)}`);
+            const data = await globalApiCall(`/products?pageSize=9&pageToken=${pageToken}&q=${encodeURIComponent(searchTerm)}&category=${encodeURIComponent(category)}`);
             sessionStorage.setItem(cacheKey, JSON.stringify(data));
             renderProducts(data.products);
             hasMore = data.hasMore;

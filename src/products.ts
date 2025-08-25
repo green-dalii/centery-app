@@ -35,7 +35,7 @@ async function getProducts(request: Request, env: Env): Promise<Response> {
   try {
     const url = new URL(request.url);
     const pageToken = url.searchParams.get('pageToken') || '';
-    const pageSize = parseInt(url.searchParams.get('pageSize') || '12', 10);
+    const pageSize = parseInt(url.searchParams.get('pageSize') || '9', 10);
     const searchTerm = url.searchParams.get('q') || '';
     const category = url.searchParams.get('category') || '';
 
